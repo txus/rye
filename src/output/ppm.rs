@@ -4,16 +4,15 @@ use std::cmp;
 
 pub struct PPM;
 
-fn clamp(min: u8, max: u8, number: u8) -> u8 {
-    cmp::max(min, cmp::min(max, number))
-}
-
 fn scale(color: Color) -> (u8, u8, u8) {
-    return (
-        clamp(0, 255, (color.red * 255.0) as u8),
-        clamp(0, 255, (color.green * 255.0) as u8),
-        clamp(0, 255, (color.blue * 255.0) as u8),
-    );
+    let r = color.red * 255.0;
+    let g = color.green * 255.0;
+    let b = color.blue * 255.0;
+    (
+        if r > 255.0 { 255 } else if r < 0.0 { 0 } else { r as u8 },
+        if g > 255.0 { 255 } else if g < 0.0 { 0 } else { g as u8 },
+        if b > 255.0 { 255 } else if b < 0.0 { 0 } else { b as u8 },
+    )
 }
 
 impl Output for PPM {
@@ -39,6 +38,11 @@ mod tests {
     use super::*;
     use crate::canvas::SmallCanvas;
     use crate::primitives::Color;
+
+    #[test]
+    fn scale_test() {
+        assert_eq!(scale(Color::new(2.0, 0.5, 1.0)), (255, 127, 255));
+    }
 
     #[test]
     fn render() {

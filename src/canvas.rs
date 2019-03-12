@@ -11,6 +11,10 @@ pub struct SmallCanvas {
     pixels: Box<[[Color; 5]; 5]>,
 }
 
+pub struct MediumCanvas {
+    pixels: Box<[[Color; 100]; 100]>,
+}
+
 pub struct LargeCanvas {
     pixels: Box<[[Color; 800]; 600]>,
 }
@@ -18,14 +22,21 @@ pub struct LargeCanvas {
 impl SmallCanvas {
     pub fn new() -> Self {
         let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 5]; 5]);
-        Self { pixels: pixels }
+        Self { pixels }
+    }
+}
+
+impl MediumCanvas {
+    pub fn new() -> Self {
+        let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 100]; 100]);
+        Self { pixels }
     }
 }
 
 impl LargeCanvas {
     pub fn new() -> Self {
         let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 800]; 600]);
-        Self { pixels: pixels }
+        Self { pixels }
     }
 }
 
@@ -45,6 +56,30 @@ impl Canvas for SmallCanvas {
     fn at(&self, y: usize, x: usize) -> Color {
         assert!(
             y < 5 && x < 5,
+            "Can't read X {} Y {} -- out of bounds",
+            x,
+            y
+        );
+        self.pixels[y][x]
+    }
+}
+
+impl Canvas for MediumCanvas {
+    fn width(&self) -> usize {
+        100
+    }
+    fn height(&self) -> usize {
+        100
+    }
+
+    fn write(&mut self, y: usize, x: usize, color: Color) {
+        assert!(y < 100 && x < 100);
+        self.pixels[y][x] = color;
+    }
+
+    fn at(&self, y: usize, x: usize) -> Color {
+        assert!(
+            y < 100 && x < 100,
             "Can't read X {} Y {} -- out of bounds",
             x,
             y
