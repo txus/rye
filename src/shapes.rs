@@ -1,5 +1,5 @@
 use crate::materials::Material;
-use crate::primitives::{Matrix, Matrix4, Point, Vector};
+use crate::primitives::{EPSILON, Matrix, Matrix4, Point, Vector};
 use crate::rays::{Intersection, Ray};
 
 pub trait Shape {
@@ -90,5 +90,89 @@ impl Shape for Sphere {
                 ]
             }
         }
+    }
+}
+
+pub struct Plane {
+    transform: Matrix4,
+    material: Material
+}
+
+impl Plane {
+    pub fn new() -> Plane {
+        Plane { transform: Matrix4::id(), material: Material::default() }
+    }
+}
+
+impl Shape for Plane {
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = m
+    }
+    fn material(&self) -> Material {
+        self.material
+    }
+    fn transform(&self) -> Matrix4 {
+        self.transform
+    }
+    fn local_normal_at(&self, _p: &Point) -> Vector {
+        Vector::new(0.0, 1.0, 0.0)
+    }
+    fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
+        if ray.direction.y.abs() < EPSILON {
+            vec!()
+        } else {
+            let t = -ray.origin.y / ray.direction.y;
+            let shape: &Shape = self;
+            vec!(Intersection { t, object: shape })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plane_normal_is_constant() {
+        let p = Plane::new();
+        assert_eq!(p.local_normal_at(&Point::new(0.0, 0.0, 0.0)), Vector::new(0.0, 1.0, 0.0));
+        assert_eq!(p.local_normal_at(&Point::new(10.0, 0.0, -10.0)), Vector::new(0.0, 1.0, 0.0));
+        assert_eq!(p.local_normal_at(&Point::new(-5.0, 0.0, 150.0)), Vector::new(0.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn plane_intersect_with_ray_parallel_to_it() {
+        let p = Plane::new();
+        let r = Ray::new(Point::new(0.0, 10.0, 0.0), Vector::new(0.0, 0.0, 1.0));
+        assert_eq!(p.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(), vec!());
+    }
+    #[test]
+    fn plane_intersect_with_complanar_ray() {
+        let p = Plane::new();
+        let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
+        assert_eq!(p.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(), vec!());
+    }
+
+    #[test]
+    fn plane_intersect_with_ray_from_above() {
+        let p = Plane::new();
+        let r = Ray::new(Point::new(0.0, 1.0, 0.0), Vector::new(0.0, -1.0, 0.0));
+        assert_eq!(
+            p.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(),
+            vec!(1.0)
+            );
+    }
+
+    #[test]
+    fn plane_intersect_with_ray_from_below() {
+        let p = Plane::new();
+        let r = Ray::new(Point::new(0.0, -1.0, 0.0), Vector::new(0.0, 1.0, 0.0));
+        assert_eq!(
+            p.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(),
+            vec!(1.0)
+            );
     }
 }

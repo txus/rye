@@ -9,40 +9,29 @@ mod world;
 use light::PointLight;
 use materials::Material;
 use primitives::{Color, Matrix4, Point, Vector};
-use shapes::{Shape, Sphere};
+use shapes::{Shape, Plane, Sphere};
 use world::{view_transform, Camera, World};
 
 use std::f32::consts::PI;
 
 fn main() {
-    let mut floor: Box<Shape> = Box::from(Sphere::unit());
-    floor.set_transform(Matrix4::scaling(10.0, 0.01, 10.0));
+    let mut floor: Box<Shape> = Box::from(Plane::new());
     floor.set_material(Material {
         color: Color::new(1.0, 0.9, 0.9),
         specular: 0.0,
         ..Material::default()
     });
 
-    let mut left_wall: Box<Shape> = Box::from(Sphere::unit());
-    left_wall.set_transform(
-        Matrix4::translation(0.0, 0.0, 5.0)
-            * Matrix4::rotation_y(-PI / 4.0)
-            * Matrix4::rotation_x(PI / 2.0)
-            * Matrix4::scaling(10.0, 0.01, 10.0),
-    );
-    left_wall.set_material(floor.material());
-
-    let mut right_wall: Box<Shape> = Box::from(Sphere::unit());
-    right_wall.set_transform(
-        Matrix4::translation(0.0, 0.0, 5.0)
-            * Matrix4::rotation_y(PI / 4.0)
-            * Matrix4::rotation_x(PI / 2.0)
-            * Matrix4::scaling(10.0, 0.01, 10.0),
-    );
-    right_wall.set_material(floor.material());
+    let mut wall: Box<Shape> = Box::from(Plane::new());
+    wall.set_transform(Matrix4::translation(0.0, 0.0, 10.0) * Matrix4::rotation_x(PI/2.0) * Matrix4::rotation_y(PI/2.0));
+    wall.set_material(Material {
+        color: Color::new(0.5, 0.9, 0.9),
+        specular: 0.5,
+        ..Material::default()
+    });
 
     let mut middle: Box<Shape> = Box::from(Sphere::unit());
-    middle.set_transform(Matrix4::translation(-0.5, 1.0, 0.5));
+    middle.set_transform(Matrix4::translation(-0.5, 0.0, 0.5));
     middle.set_material(Material {
         color: Color::new(0.1, 1.0, 0.5),
         diffuse: 0.7,
@@ -72,7 +61,7 @@ fn main() {
 
     let mut world = World::default();
     world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-    world.objects = vec![floor, left_wall, right_wall, middle, right, left];
+    world.objects = vec![floor, wall, middle, right, left];
 
     let mut camera = Camera::new(100, 50, PI / 3.0);
     camera.transform = view_transform(
