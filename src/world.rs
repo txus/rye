@@ -1,11 +1,12 @@
-use crate::rays::{Ray, Intersection, Sphere, Precomputation};
+use crate::canvas::{Canvas, DynamicCanvas};
+use crate::light::PointLight;
 use crate::materials::Material;
-use crate::light::{PointLight};
-use crate::primitives::{Point, Color, Matrix4, Matrix, Vector};
+use crate::primitives::{Color, Matrix, Matrix4, Point, Vector};
+use crate::rays::{Intersection, Precomputation, Ray, Sphere};
 
 pub struct World {
-    objects: Vec<Sphere>,
-    light_source: PointLight
+    pub objects: Vec<Sphere>,
+    pub light_source: PointLight,
 }
 
 impl World {
@@ -22,13 +23,13 @@ impl World {
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
 
         World {
-            objects: vec!(s1, s2),
-            light_source: light
+            objects: vec![s1, s2],
+            light_source: light,
         }
     }
 
     pub fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
-        let mut out : Vec<Intersection> = vec!();
+        let mut out: Vec<Intersection> = vec![];
         for object in &self.objects {
             out.append(&mut object.intersect(&ray))
         }
@@ -37,7 +38,9 @@ impl World {
     }
 
     pub fn shade(&self, c: &Precomputation) -> Color {
-        c.object.material.lighting(&self.light_source, &c.point, &c.eye, &c.normal)
+        c.object
+            .material
+            .lighting(&self.light_source, &c.point, &c.eye, &c.normal)
     }
 
     pub fn color_at(&self, r: &Ray) -> Color {
@@ -53,17 +56,16 @@ pub struct Camera {
     hsize: u32,
     vsize: u32,
     fov: f32,
-    transform: Matrix4
+    pub transform: Matrix4,
+    half_width: f32,
+    half_height: f32,
+    pixel_size: f32,
 }
 
 impl Camera {
     pub fn new(hsize: u32, vsize: u32, fov: f32) -> Camera {
-        Camera { hsize, vsize, fov, transform: Matrix4::id() }
-    }
-
-    pub fn pixel_size(&self) -> f32 {
-        let half_view = (self.fov / 2.0).tan();
-        let aspect_ratio = self.hsize as f32 / self.vsize as f32;
+        let half_view = (fov / 2.0).tan();
+        let aspect_ratio = hsize as f32 / vsize as f32;
         let half_width: f32;
         let half_height: f32;
         if aspect_ratio >= 1.0 {
@@ -73,7 +75,46 @@ impl Camera {
             half_width = half_view * aspect_ratio;
             half_height = half_view;
         }
-        (half_width * 2.0) / self.hsize as f32
+        let pixel_size = (half_width * 2.0) / hsize as f32;
+
+        Camera {
+            hsize,
+            vsize,
+            fov,
+            pixel_size,
+            half_width,
+            half_height,
+            transform: Matrix4::id(),
+        }
+    }
+
+    pub fn ray_for_pixel(&self, px: u32, py: u32) -> Ray {
+        let pixel_size = self.pixel_size;
+        let xoffset = (px as f32 + 0.5) * pixel_size;
+        let yoffset = (py as f32 + 0.5) * pixel_size;
+
+        let world_x = self.half_width - xoffset;
+        let world_y = self.half_height - yoffset;
+
+        let inv = self.transform.inverse();
+
+        let pixel = inv * Point::new(world_x, world_y, -1.0);
+        let origin = inv * Point::new(0.0, 0.0, 0.0);
+        let direction = (pixel - origin).normalize();
+
+        Ray::new(origin, direction)
+    }
+
+    pub fn render(&self, world: &World) -> DynamicCanvas {
+        let mut canvas = DynamicCanvas::new(self.hsize as usize, self.vsize as usize);
+        for y in 0..self.vsize {
+            for x in 0..self.hsize {
+                let ray = self.ray_for_pixel(x, y);
+                let color = world.color_at(&ray);
+                canvas.write(y as usize, x as usize, color);
+            }
+        }
+        canvas
     }
 }
 
@@ -85,7 +126,7 @@ pub fn view_transform(from: Point, to: Point, up: Vector) -> Matrix4 {
         [left.x, left.y, left.z, 0.0],
         [true_up.x, true_up.y, true_up.z, 0.0],
         [-forward.x, -forward.y, -forward.z, 0.0],
-        [0.0, 0.0, 0.0, 1.0]
+        [0.0, 0.0, 0.0, 1.0],
     ]);
     orientation * Matrix4::translation(-from.x, -from.y, -from.z)
 }
@@ -93,9 +134,9 @@ pub fn view_transform(from: Point, to: Point, up: Vector) -> Matrix4 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::{Point, Color};
-    use crate::materials::Material;
     use crate::light::PointLight;
+    use crate::materials::Material;
+    use crate::primitives::{Color, Point};
 
     use std::f32::consts::PI;
 
@@ -131,7 +172,10 @@ mod tests {
         let w = World::default();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let shape = w.objects.first().unwrap();
-        let i = Intersection { t: 4.0, object: shape };
+        let i = Intersection {
+            t: 4.0,
+            object: shape,
+        };
         let comps = i.precompute(&r);
         assert_eq!(w.shade(&comps), Color::new(0.38066, 0.47583, 0.2855));
     }
@@ -142,7 +186,10 @@ mod tests {
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::new(1.0, 1.0, 1.0));
         let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
         let shape = w.objects.last().unwrap();
-        let i = Intersection { t: 0.5, object: shape };
+        let i = Intersection {
+            t: 0.5,
+            object: shape,
+        };
         let comps = i.precompute(&r);
         assert_eq!(w.shade(&comps), Color::new(0.90498, 0.90498, 0.90498));
     }
@@ -176,7 +223,10 @@ mod tests {
         let from = Point::new(0.0, 0.0, 0.0);
         let to = Point::new(0.0, 0.0, 1.0);
         let up = Vector::new(0.0, 1.0, 0.0);
-        assert_eq!(view_transform(from, to, up), Matrix4::scaling(-1.0, 1.0, -1.0));
+        assert_eq!(
+            view_transform(from, to, up),
+            Matrix4::scaling(-1.0, 1.0, -1.0)
+        );
     }
 
     #[test]
@@ -184,7 +234,10 @@ mod tests {
         let from = Point::new(0.0, 0.0, 8.0);
         let to = Point::new(0.0, 0.0, 0.0);
         let up = Vector::new(0.0, 1.0, 0.0);
-        assert_eq!(view_transform(from, to, up), Matrix4::translation(0.0, 0.0, -8.0));
+        assert_eq!(
+            view_transform(from, to, up),
+            Matrix4::translation(0.0, 0.0, -8.0)
+        );
     }
 
     #[test]
@@ -195,20 +248,60 @@ mod tests {
         assert_eq!(
             view_transform(from, to, up),
             Matrix4::new([
-                [-0.50709 , 0.50709 ,  0.67612 , -2.36643 ],
-                [ 0.76772 , 0.60609 ,  0.12122 , -2.82843 ],
-                [-0.35857 , 0.59761 , -0.71714 ,  0.00000 ],
-                [ 0.00000 , 0.00000 ,  0.00000 ,  1.00000 ]
+                [-0.50709, 0.50709, 0.67612, -2.36643],
+                [0.76772, 0.60609, 0.12122, -2.82843],
+                [-0.35857, 0.59761, -0.71714, 0.00000],
+                [0.00000, 0.00000, 0.00000, 1.00000]
             ])
         );
     }
 
     #[test]
     fn camera_pixel_size() {
-        let c = Camera::new(200, 125, PI/2.0);
-        assert_eq!(c.pixel_size(), 0.01);
+        let c = Camera::new(200, 125, PI / 2.0);
+        assert_eq!(c.pixel_size, 0.01);
 
-        let c2 = Camera::new(125, 200, PI/2.0);
-        assert_eq!(c2.pixel_size(), 0.01);
+        let c2 = Camera::new(125, 200, PI / 2.0);
+        assert_eq!(c2.pixel_size, 0.01);
+    }
+
+    #[test]
+    fn ray_through_center() {
+        let c = Camera::new(201, 101, PI / 2.0);
+        let r = c.ray_for_pixel(100, 50);
+        assert_eq!(r.origin, Point::new(0.0, 0.0, 0.0));
+        assert_eq!(r.direction, Vector::new(0.0, 0.0, -1.0));
+    }
+
+    #[test]
+    fn ray_through_corner() {
+        let c = Camera::new(201, 101, PI / 2.0);
+        let r = c.ray_for_pixel(0, 0);
+        assert_eq!(r.origin, Point::new(0.0, 0.0, 0.0));
+        assert_eq!(r.direction, Vector::new(0.66519, 0.33259, -0.66851));
+    }
+
+    #[test]
+    fn ray_with_transformed_camera() {
+        let mut c = Camera::new(201, 101, PI / 2.0);
+        c.transform = Matrix4::rotation_y(PI / 4.0) * Matrix4::translation(0.0, -2.0, 5.0);
+        let r = c.ray_for_pixel(100, 50);
+        assert_eq!(r.origin, Point::new(0.0, 2.0, -5.0));
+        assert_eq!(
+            r.direction,
+            Vector::new(2_f32.sqrt() / 2.0, 0.0, -2_f32.sqrt() / 2.0)
+        );
+    }
+
+    #[test]
+    fn camera_render_world() {
+        let w = World::default();
+        let from = Point::new(0.0, 0.0, -5.0);
+        let to = Point::new(0.0, 0.0, 0.0);
+        let up = Vector::new(0.0, 1.0, 0.0);
+        let mut c = Camera::new(11, 11, PI / 2.0);
+        c.transform = view_transform(from, to, up);
+        let image = c.render(&w);
+        assert_eq!(image.at(5, 5), Color::new(0.38066, 0.47583, 0.2855));
     }
 }

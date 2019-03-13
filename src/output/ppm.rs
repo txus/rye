@@ -9,14 +9,32 @@ fn scale(color: Color) -> (u8, u8, u8) {
     let g = color.green * 255.0;
     let b = color.blue * 255.0;
     (
-        if r > 255.0 { 255 } else if r < 0.0 { 0 } else { r as u8 },
-        if g > 255.0 { 255 } else if g < 0.0 { 0 } else { g as u8 },
-        if b > 255.0 { 255 } else if b < 0.0 { 0 } else { b as u8 },
+        if r > 255.0 {
+            255
+        } else if r < 0.0 {
+            0
+        } else {
+            r as u8
+        },
+        if g > 255.0 {
+            255
+        } else if g < 0.0 {
+            0
+        } else {
+            g as u8
+        },
+        if b > 255.0 {
+            255
+        } else if b < 0.0 {
+            0
+        } else {
+            b as u8
+        },
     )
 }
 
 impl Output for PPM {
-    fn render<C: Canvas>(&self, c: C) -> String {
+    fn render<C: Canvas>(&self, c: &C) -> String {
         let w = c.width();
         let h = c.height();
         let mut s = String::new();
@@ -36,7 +54,7 @@ impl Output for PPM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canvas::SmallCanvas;
+    use crate::canvas::DynamicCanvas;
     use crate::primitives::Color;
 
     #[test]
@@ -47,9 +65,9 @@ mod tests {
     #[test]
     fn render() {
         let f = PPM {};
-        let mut c = SmallCanvas::new();
+        let mut c = DynamicCanvas::new(5, 5);
         c.write(2, 4, Color::new(1.0, 0.5, 0.0));
-        let output = f.render(c);
+        let output = f.render(&c);
         let mut lines = output.lines();
         assert_eq!(lines.next(), Some("P3"));
         assert_eq!(lines.next(), Some("5 5"));

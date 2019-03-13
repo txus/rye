@@ -1,5 +1,5 @@
 use crate::light::PointLight;
-use crate::primitives::{Vector, Point, Color};
+use crate::primitives::{Color, Point, Vector};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Material {
@@ -7,29 +7,43 @@ pub struct Material {
     pub ambient: f32,
     pub diffuse: f32,
     pub specular: f32,
-    pub shininess: f32
+    pub shininess: f32,
 }
 
 impl Material {
-    pub fn new(color: Color, ambient: f32, diffuse: f32, specular: f32, shininess: f32) -> Material {
-        Material { color, ambient, diffuse, specular, shininess }
+    pub fn new(
+        color: Color,
+        ambient: f32,
+        diffuse: f32,
+        specular: f32,
+        shininess: f32,
+    ) -> Material {
+        Material {
+            color,
+            ambient,
+            diffuse,
+            specular,
+            shininess,
+        }
     }
 
     pub fn default() -> Material {
         Self::new(Color::new(1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0)
     }
 
-    pub fn lighting(&self, light: &PointLight, position: &Point, eye: &Vector, normal: &Vector) -> Color {
+    pub fn lighting(
+        &self,
+        light: &PointLight,
+        position: &Point,
+        eye: &Vector,
+        normal: &Vector,
+    ) -> Color {
         let effective_color = self.color * light.intensity;
         let lightv = (light.position - *position).normalize();
         let ambient = effective_color * self.ambient;
         let light_dot_normal = lightv.dot(normal);
         let diffuse: Color;
         let specular: Color;
-
-        println!("lightv: {:?}", lightv);
-        println!("normalv: {:?}", normal);
-        println!("light_dot_normal: {:?}", light_dot_normal);
 
         if light_dot_normal < 0.0 {
             diffuse = Color::black();
@@ -52,7 +66,7 @@ impl Material {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::{Vector, Point, Color};
+    use crate::primitives::{Color, Point, Vector};
 
     #[test]
     fn lighting_eye_between_light_and_surface() {

@@ -1,22 +1,25 @@
-use crate::primitives::{Point, Color};
+use crate::primitives::{Color, Point};
 
-pub trait Light where Self : std::fmt::Debug + PartialEq {
-
+pub trait Light
+where
+    Self: std::fmt::Debug + PartialEq,
+{
 }
 
 #[derive(Debug, PartialEq)]
 pub struct PointLight {
     pub position: Point,
-    pub intensity: Color
+    pub intensity: Color,
 }
 
-impl Light for PointLight {
-
-}
+impl Light for PointLight {}
 
 impl PointLight {
     pub fn new(position: Point, intensity: Color) -> PointLight {
-        PointLight { position, intensity }
+        PointLight {
+            position,
+            intensity,
+        }
     }
 }
 

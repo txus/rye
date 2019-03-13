@@ -1,4 +1,4 @@
-const EPSILON : f32 = 0.0001;
+const EPSILON: f32 = 0.0001;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
@@ -91,28 +91,33 @@ impl Matrix4 {
     }
 
     pub fn submatrix(&self, row: usize, column: usize) -> Matrix3 {
-        let v: Vec<Vec<f32>> = self.m.into_iter()
-          .enumerate()
-          .filter(|&(i, _)| i != row)
-          .map(|(_, cs)| {
-              cs.into_iter().enumerate()
-                .filter(|&(i, _)| i != column)
-                .map(|(_, v)| *v).collect::<Vec<f32>>()
-          }).collect();
+        let v: Vec<Vec<f32>> = self
+            .m
+            .into_iter()
+            .enumerate()
+            .filter(|&(i, _)| i != row)
+            .map(|(_, cs)| {
+                cs.into_iter()
+                    .enumerate()
+                    .filter(|&(i, _)| i != column)
+                    .map(|(_, v)| *v)
+                    .collect::<Vec<f32>>()
+            })
+            .collect();
 
         Matrix3::new([
             [v[0][0], v[0][1], v[0][2]],
             [v[1][0], v[1][1], v[1][2]],
-            [v[2][0], v[2][1], v[2][2]]
+            [v[2][0], v[2][1], v[2][2]],
         ])
     }
 
     pub fn transpose(&self) -> Self {
         Self::new([
-            [self.at(0,0), self.at(1,0), self.at(2,0), self.at(3,0)],
-            [self.at(0,1), self.at(1,1), self.at(2,1), self.at(3,1)],
-            [self.at(0,2), self.at(1,2), self.at(2,2), self.at(3,2)],
-            [self.at(0,3), self.at(1,3), self.at(2,3), self.at(3,3)]
+            [self.at(0, 0), self.at(1, 0), self.at(2, 0), self.at(3, 0)],
+            [self.at(0, 1), self.at(1, 1), self.at(2, 1), self.at(3, 1)],
+            [self.at(0, 2), self.at(1, 2), self.at(2, 2), self.at(3, 2)],
+            [self.at(0, 3), self.at(1, 3), self.at(2, 3), self.at(3, 3)],
         ])
     }
 
@@ -131,10 +136,10 @@ impl Matrix4 {
 
     pub fn determinant(&self) -> f32 {
         let row = self.m[0];
-        row[0] * self.cofactor(0, 0) + 
-        row[1] * self.cofactor(0, 1) + 
-        row[2] * self.cofactor(0, 2) +
-        row[3] * self.cofactor(0, 3)
+        row[0] * self.cofactor(0, 0)
+            + row[1] * self.cofactor(0, 1)
+            + row[2] * self.cofactor(0, 2)
+            + row[3] * self.cofactor(0, 3)
     }
 
     pub fn inverse(&self) -> Self {
@@ -144,10 +149,30 @@ impl Matrix4 {
         }
 
         Self::new([
-            [self.cofactor(0, 0) / d, self.cofactor(1, 0) / d, self.cofactor(2, 0) / d, self.cofactor(3, 0) / d],
-            [self.cofactor(0, 1) / d, self.cofactor(1, 1) / d, self.cofactor(2, 1) / d, self.cofactor(3, 1) / d],
-            [self.cofactor(0, 2) / d, self.cofactor(1, 2) / d, self.cofactor(2, 2) / d, self.cofactor(3, 2) / d],
-            [self.cofactor(0, 3) / d, self.cofactor(1, 3) / d, self.cofactor(2, 3) / d, self.cofactor(3, 3) / d]
+            [
+                self.cofactor(0, 0) / d,
+                self.cofactor(1, 0) / d,
+                self.cofactor(2, 0) / d,
+                self.cofactor(3, 0) / d,
+            ],
+            [
+                self.cofactor(0, 1) / d,
+                self.cofactor(1, 1) / d,
+                self.cofactor(2, 1) / d,
+                self.cofactor(3, 1) / d,
+            ],
+            [
+                self.cofactor(0, 2) / d,
+                self.cofactor(1, 2) / d,
+                self.cofactor(2, 2) / d,
+                self.cofactor(3, 2) / d,
+            ],
+            [
+                self.cofactor(0, 3) / d,
+                self.cofactor(1, 3) / d,
+                self.cofactor(2, 3) / d,
+                self.cofactor(3, 3) / d,
+            ],
         ])
     }
 }
@@ -204,7 +229,6 @@ impl std::cmp::PartialEq for Matrix2 {
         true
     }
 }
-
 
 fn c(a: &Matrix4, b: &Matrix4, row: usize, column: usize) -> f32 {
     a.at(row, 0) * b.at(0, column)
@@ -285,19 +309,21 @@ impl Matrix3 {
     }
 
     pub fn submatrix(&self, row: usize, column: usize) -> Matrix2 {
-        let v: Vec<Vec<f32>> = self.m.into_iter()
-          .enumerate()
-          .filter(|&(i, _)| i != row)
-          .map(|(_, cs)| {
-              cs.into_iter().enumerate()
-                .filter(|&(i, _)| i != column)
-                .map(|(_, v)| *v).collect::<Vec<f32>>()
-          }).collect();
+        let v: Vec<Vec<f32>> = self
+            .m
+            .into_iter()
+            .enumerate()
+            .filter(|&(i, _)| i != row)
+            .map(|(_, cs)| {
+                cs.into_iter()
+                    .enumerate()
+                    .filter(|&(i, _)| i != column)
+                    .map(|(_, v)| *v)
+                    .collect::<Vec<f32>>()
+            })
+            .collect();
 
-        Matrix2::new([
-            [v[0][0], v[0][1]],
-            [v[1][0], v[1][1]]
-        ])
+        Matrix2::new([[v[0][0], v[0][1]], [v[1][0], v[1][1]]])
     }
 
     pub fn minor(&self, row: usize, column: usize) -> f32 {
@@ -315,9 +341,7 @@ impl Matrix3 {
 
     pub fn determinant(&self) -> f32 {
         let row = self.m[0];
-        row[0] * self.cofactor(0, 0) + 
-        row[1] * self.cofactor(0, 1) + 
-        row[2] * self.cofactor(0, 2)
+        row[0] * self.cofactor(0, 0) + row[1] * self.cofactor(0, 1) + row[2] * self.cofactor(0, 2)
     }
 }
 
@@ -341,7 +365,7 @@ impl Matrix2 {
     }
 
     pub fn determinant(&self) -> f32 {
-        self.at(0, 0) * self.at(1,1) - self.at(0, 1) * self.at(1, 0)
+        self.at(0, 0) * self.at(1, 1) - self.at(0, 1) * self.at(1, 0)
     }
 }
 
@@ -427,7 +451,6 @@ impl std::cmp::PartialEq for Vector {
         close(self.x, other.x) && close(self.y, other.y) && close(self.z, other.z)
     }
 }
-
 
 impl std::cmp::PartialEq for Color {
     fn eq(&self, other: &Self) -> bool {
@@ -792,12 +815,15 @@ mod tests {
             [0.0, 0.0, 0.0, 1.0],
         ]);
 
-        assert_eq!(a.transpose(), Matrix4::new([
-            [1.0, 2.0, 8.0, 0.0],
-            [2.0, 4.0, 6.0, 0.0],
-            [3.0, 4.0, 4.0, 0.0],
-            [4.0, 2.0, 1.0, 1.0],
-        ]));
+        assert_eq!(
+            a.transpose(),
+            Matrix4::new([
+                [1.0, 2.0, 8.0, 0.0],
+                [2.0, 4.0, 6.0, 0.0],
+                [3.0, 4.0, 4.0, 0.0],
+                [4.0, 2.0, 1.0, 1.0],
+            ])
+        );
 
         assert_eq!(Matrix4::id().transpose(), Matrix4::id());
     }
@@ -807,11 +833,7 @@ mod tests {
         let a = Matrix2::new([[1.0, 5.0], [-3.0, 2.0]]);
         assert_eq!(a.determinant(), 17.0);
 
-        let b = Matrix3::new([
-            [1.0, 2.0, 6.0],
-            [-5.0, 8.0, -4.0],
-            [2.0, 6.0, 4.0]
-        ]);
+        let b = Matrix3::new([[1.0, 2.0, 6.0], [-5.0, 8.0, -4.0], [2.0, 6.0, 4.0]]);
         assert_eq!(b.cofactor(0, 0), 56.0);
         assert_eq!(b.cofactor(0, 1), 12.0);
         assert_eq!(b.cofactor(0, 2), -46.0);
@@ -839,41 +861,25 @@ mod tests {
             [0.0, 0.0, 0.0, 1.0],
         ]);
 
-        assert_eq!(a.submatrix(1, 2), Matrix3::new([
-            [1.0, 2.0, 4.0],
-            [8.0, 6.0, 1.0],
-            [0.0, 0.0, 1.0]
-        ]));
+        assert_eq!(
+            a.submatrix(1, 2),
+            Matrix3::new([[1.0, 2.0, 4.0], [8.0, 6.0, 1.0], [0.0, 0.0, 1.0]])
+        );
 
-        let b = Matrix3::new([
-            [1.0, 2.0, 4.0],
-            [8.0, 6.0, 1.0],
-            [0.0, 0.0, 1.0]
-        ]);
+        let b = Matrix3::new([[1.0, 2.0, 4.0], [8.0, 6.0, 1.0], [0.0, 0.0, 1.0]]);
 
-        assert_eq!(b.submatrix(1, 1), Matrix2::new([
-            [1.0, 4.0],
-            [0.0, 1.0]
-        ]));
+        assert_eq!(b.submatrix(1, 1), Matrix2::new([[1.0, 4.0], [0.0, 1.0]]));
     }
 
     #[test]
     fn matrix_minor() {
-        let b = Matrix3::new([
-            [3.0, 5.0, 0.0],
-            [2.0, -1.0, -7.0],
-            [6.0, -1.0, 5.0]
-        ]);
+        let b = Matrix3::new([[3.0, 5.0, 0.0], [2.0, -1.0, -7.0], [6.0, -1.0, 5.0]]);
         assert_eq!(b.minor(1, 0), 25.0);
     }
 
     #[test]
     fn matrix_cofactor() {
-        let b = Matrix3::new([
-            [3.0, 5.0, 0.0],
-            [2.0, -1.0, -7.0],
-            [6.0, -1.0, 5.0]
-        ]);
+        let b = Matrix3::new([[3.0, 5.0, 0.0], [2.0, -1.0, -7.0], [6.0, -1.0, 5.0]]);
         assert_eq!(b.cofactor(0, 0), -12.0);
         assert_eq!(b.cofactor(1, 0), -25.0);
     }
@@ -886,26 +892,30 @@ mod tests {
             [-6.0, 0.0, 9.0, 6.0],
             [-3.0, 0.0, -9.0, -4.0],
         ]);
-        assert_eq!(a.inverse(), Matrix4::new([
-         [-0.15384616, -0.15384616, -0.2820513, -0.53846157],
-         [-0.07692308, 0.12307692, 0.025641026, 0.03076923],
-         [0.35897437, 0.35897437, 0.43589744, 0.9230769],
-         [-0.6923077, -0.6923077, -0.7692308, -1.9230769]]));
+        assert_eq!(
+            a.inverse(),
+            Matrix4::new([
+                [-0.15384616, -0.15384616, -0.2820513, -0.53846157],
+                [-0.07692308, 0.12307692, 0.025641026, 0.03076923],
+                [0.35897437, 0.35897437, 0.43589744, 0.9230769],
+                [-0.6923077, -0.6923077, -0.7692308, -1.9230769]
+            ])
+        );
     }
 
     #[test]
     fn matrix_inversion_property() {
         let a = Matrix4::new([
             [3.0, -9.0, 7.0, 3.0],
-            [3.0,-8.0, 2.0,-9.0],
+            [3.0, -8.0, 2.0, -9.0],
             [-4.0, 4.0, 4.0, 1.0],
-            [-6.0, 5.0,-1.0, 1.0]
+            [-6.0, 5.0, -1.0, 1.0],
         ]);
         let b = Matrix4::new([
-            [8.0,2.0,2.0,2.0],
-            [3.0,-1.0,7.0,0.0],
-            [7.0,0.0,5.0,4.0],
-            [6.0,-2.0,0.0,5.0],
+            [8.0, 2.0, 2.0, 2.0],
+            [3.0, -1.0, 7.0, 0.0],
+            [7.0, 0.0, 5.0, 4.0],
+            [6.0, -2.0, 0.0, 5.0],
         ]);
 
         let c = a * b;
@@ -954,11 +964,17 @@ mod tests {
         let point = Point::new(0.0, 1.0, 0.0);
         let half_quarter = Matrix4::rotation_x(PI / 4.0);
         let full_quarter = Matrix4::rotation_x(PI / 2.0);
-        assert_eq!(half_quarter * point, Point::new(0.0, 2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0));
+        assert_eq!(
+            half_quarter * point,
+            Point::new(0.0, 2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0)
+        );
         assert_eq!(full_quarter * point, Point::new(0.0, 0.0, 1.0));
 
         let inv = half_quarter.inverse();
-        assert_eq!(inv * point, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0));
+        assert_eq!(
+            inv * point,
+            Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)
+        );
     }
 
     #[test]
@@ -966,7 +982,10 @@ mod tests {
         let point = Point::new(0.0, 0.0, 1.0);
         let half_quarter = Matrix4::rotation_y(PI / 4.0);
         let full_quarter = Matrix4::rotation_y(PI / 2.0);
-        assert_eq!(half_quarter * point, Point::new(2_f32.sqrt() / 2.0, 0.0, 2_f32.sqrt() / 2.0));
+        assert_eq!(
+            half_quarter * point,
+            Point::new(2_f32.sqrt() / 2.0, 0.0, 2_f32.sqrt() / 2.0)
+        );
         assert_eq!(full_quarter * point, Point::new(1.0, 0.0, 0.0));
     }
 
@@ -975,7 +994,10 @@ mod tests {
         let point = Point::new(0.0, 1.0, 0.0);
         let half_quarter = Matrix4::rotation_z(PI / 4.0);
         let full_quarter = Matrix4::rotation_z(PI / 2.0);
-        assert_eq!(half_quarter * point, Point::new(-2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0, 0.0));
+        assert_eq!(
+            half_quarter * point,
+            Point::new(-2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0, 0.0)
+        );
         assert_eq!(full_quarter * point, Point::new(-1.0, 0.0, 0.0));
     }
 

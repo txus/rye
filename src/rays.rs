@@ -1,10 +1,10 @@
-use crate::primitives::{Vector, Point, Matrix4};
-use crate::primitives::Matrix;
 use crate::materials::Material;
+use crate::primitives::Matrix;
+use crate::primitives::{Matrix4, Point, Vector};
 
 pub struct Ray {
     pub origin: Point,
-    pub direction: Vector
+    pub direction: Vector,
 }
 
 impl Ray {
@@ -17,10 +17,7 @@ impl Ray {
     }
 
     pub fn transform(&self, transform: Matrix4) -> Ray {
-        Ray::new(
-            transform * self.origin,
-            transform * self.direction
-        )
+        Ray::new(transform * self.origin, transform * self.direction)
     }
 }
 
@@ -36,7 +33,7 @@ pub struct Precomputation<'a> {
     pub point: Point,
     pub eye: Vector,
     pub normal: Vector,
-    pub inside: bool
+    pub inside: bool,
 }
 
 impl<'a> Intersection<'a> {
@@ -45,7 +42,7 @@ impl<'a> Intersection<'a> {
         let is: Vec<&Intersection> = xs.iter().filter(|x| x.t >= 0.0).collect();
         match is.first() {
             Some(i) => Some(*i),
-            None => None
+            None => None,
         }
     }
 
@@ -60,7 +57,7 @@ impl<'a> Intersection<'a> {
             point: point,
             eye: eye,
             normal: if inside { -normal } else { normal },
-            inside: inside
+            inside: inside,
         }
     }
 }
@@ -70,7 +67,7 @@ pub struct Sphere {
     origin: Point,
     radius: f32,
     pub transform: Matrix4,
-    pub material: Material
+    pub material: Material,
 }
 
 impl Sphere {
@@ -80,7 +77,12 @@ impl Sphere {
 
     pub fn new(radius: f32, origin: Point) -> Self {
         let material = Material::default();
-        Sphere { radius, origin, material, transform: Matrix4::id() }
+        Sphere {
+            radius,
+            origin,
+            material,
+            transform: Matrix4::id(),
+        }
     }
 
     pub fn intersect(&self, r: &Ray) -> Vec<Intersection> {
@@ -92,20 +94,32 @@ impl Sphere {
         let discriminant = b.powf(2.0) - 4.0 * a * c;
 
         if discriminant < 0.0 {
-            vec!()
+            vec![]
         } else {
             let t1 = (-b - discriminant.sqrt()) / (a * 2.0);
             let t2 = (-b + discriminant.sqrt()) / (a * 2.0);
             if t1 > t2 {
-                vec!(
-                    Intersection { t: t2, object: &self },
-                    Intersection { t: t1, object: &self }
-                )
+                vec![
+                    Intersection {
+                        t: t2,
+                        object: &self,
+                    },
+                    Intersection {
+                        t: t1,
+                        object: &self,
+                    },
+                ]
             } else {
-                vec!(
-                    Intersection { t: t1, object: &self },
-                    Intersection { t: t2, object: &self }
-                )
+                vec![
+                    Intersection {
+                        t: t1,
+                        object: &self,
+                    },
+                    Intersection {
+                        t: t2,
+                        object: &self,
+                    },
+                ]
             }
         }
     }
@@ -179,7 +193,10 @@ mod tests {
         assert_eq!(
             is,
             vec!(
-                Intersection { t: -1.0, object: &s },
+                Intersection {
+                    t: -1.0,
+                    object: &s
+                },
                 Intersection { t: 1.0, object: &s }
             )
         );
@@ -189,8 +206,14 @@ mod tests {
         assert_eq!(
             is,
             vec!(
-                Intersection { t: -6.0, object: &s },
-                Intersection { t: -4.0, object: &s }
+                Intersection {
+                    t: -6.0,
+                    object: &s
+                },
+                Intersection {
+                    t: -4.0,
+                    object: &s
+                }
             )
         );
     }
@@ -202,17 +225,29 @@ mod tests {
         let mut i2 = Intersection { t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&mut vec!(i1, i2)), Some(&i1));
 
-        i1 = Intersection { t: -1.0, object: &s };
+        i1 = Intersection {
+            t: -1.0,
+            object: &s,
+        };
         i2 = Intersection { t: 1.0, object: &s };
         assert_eq!(Intersection::hit(&mut vec!(i1, i2)), Some(&i2));
 
-        i1 = Intersection { t: -2.0, object: &s };
-        i2 = Intersection { t: -1.0, object: &s };
+        i1 = Intersection {
+            t: -2.0,
+            object: &s,
+        };
+        i2 = Intersection {
+            t: -1.0,
+            object: &s,
+        };
         assert_eq!(Intersection::hit(&mut vec!(i1, i2)), None);
 
         i1 = Intersection { t: 5.0, object: &s };
         i2 = Intersection { t: 7.0, object: &s };
-        let i3 = Intersection { t: -3.0, object: &s };
+        let i3 = Intersection {
+            t: -3.0,
+            object: &s,
+        };
         let i4 = Intersection { t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&mut vec!(i1, i2, i3, i4)), Some(&i4));
     }
@@ -221,7 +256,7 @@ mod tests {
     fn hit_when_intersection_occurs_on_outside() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let s = Sphere::unit();
-        let i = Intersection { t: 4.0, object: &s};
+        let i = Intersection { t: 4.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.inside, false);
     }
@@ -230,7 +265,7 @@ mod tests {
     fn hit_when_intersection_occurs_on_inside() {
         let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
         let s = Sphere::unit();
-        let i = Intersection { t: 1.0, object: &s};
+        let i = Intersection { t: 1.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.point, Point::new(0.0, 0.0, 1.0));
         assert_eq!(c.eye, Vector::new(0.0, 0.0, -1.0));
@@ -242,9 +277,7 @@ mod tests {
     fn precomputing_state_intersection() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let s = Sphere::unit();
-        let i = Intersection {
-            t: 4.0, object: &s
-        };
+        let i = Intersection { t: 4.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.t, i.t);
         assert_eq!(c.point, Point::new(0.0, 0.0, -1.0));
@@ -300,19 +333,38 @@ mod tests {
     #[test]
     fn sphere_normal() {
         let mut s = Sphere::unit();
-        assert_eq!(s.normal(Point::new(1.0, 0.0, 0.0)), Vector::new(1.0, 0.0, 0.0));
-        assert_eq!(s.normal(Point::new(0.0, 1.0, 0.0)), Vector::new(0.0, 1.0, 0.0));
-        assert_eq!(s.normal(Point::new(0.0, 0.0, 1.0)), Vector::new(0.0, 0.0, 1.0));
-        let v = s.normal(Point::new(3_f32.sqrt() / 3.0, 3_f32.sqrt() / 3.0, 3_f32.sqrt() / 3.0));
+        assert_eq!(
+            s.normal(Point::new(1.0, 0.0, 0.0)),
+            Vector::new(1.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            s.normal(Point::new(0.0, 1.0, 0.0)),
+            Vector::new(0.0, 1.0, 0.0)
+        );
+        assert_eq!(
+            s.normal(Point::new(0.0, 0.0, 1.0)),
+            Vector::new(0.0, 0.0, 1.0)
+        );
+        let v = s.normal(Point::new(
+            3_f32.sqrt() / 3.0,
+            3_f32.sqrt() / 3.0,
+            3_f32.sqrt() / 3.0,
+        ));
         assert_eq!(v, v.normalize());
 
         let translate = Matrix4::translation(0.0, 1.0, 0.0);
-        let scale_and_rotate = Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI/5.0);
+        let scale_and_rotate = Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0);
 
         s.set_transform(translate);
-        assert_eq!(s.normal(Point::new(0.0, 1.70711, -0.70711)), Vector::new(0.0, 0.70711, -0.70711));
+        assert_eq!(
+            s.normal(Point::new(0.0, 1.70711, -0.70711)),
+            Vector::new(0.0, 0.70711, -0.70711)
+        );
 
         s.set_transform(scale_and_rotate);
-        assert_eq!(s.normal(Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)), Vector::new(0.0, 0.970140, -0.24254));
+        assert_eq!(
+            s.normal(Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
+            Vector::new(0.0, 0.970140, -0.24254)
+        );
     }
 }

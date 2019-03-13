@@ -7,103 +7,38 @@ pub trait Canvas {
     fn at(&self, y: usize, x: usize) -> Color;
 }
 
-pub struct SmallCanvas {
-    pixels: Box<[[Color; 5]; 5]>,
+pub struct DynamicCanvas {
+    width: usize,
+    height: usize,
+    pixels: Vec<Vec<Color>>,
 }
 
-pub struct MediumCanvas {
-    pixels: Box<[[Color; 100]; 100]>,
-}
-
-pub struct LargeCanvas {
-    pixels: Box<[[Color; 800]; 600]>,
-}
-
-impl SmallCanvas {
-    pub fn new() -> Self {
-        let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 5]; 5]);
-        Self { pixels }
+impl DynamicCanvas {
+    pub fn new(width: usize, height: usize) -> Self {
+        let pixels = vec![vec![Color::black(); width]; height];
+        Self {
+            width,
+            height,
+            pixels,
+        }
     }
 }
 
-impl MediumCanvas {
-    pub fn new() -> Self {
-        let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 100]; 100]);
-        Self { pixels }
-    }
-}
-
-impl LargeCanvas {
-    pub fn new() -> Self {
-        let pixels = Box::new([[Color::new(0.0, 0.0, 0.0); 800]; 600]);
-        Self { pixels }
-    }
-}
-
-impl Canvas for SmallCanvas {
+impl Canvas for DynamicCanvas {
     fn width(&self) -> usize {
-        5
+        self.width
     }
     fn height(&self) -> usize {
-        5
+        self.height
     }
-
     fn write(&mut self, y: usize, x: usize, color: Color) {
-        assert!(y < 5 && x < 5);
+        assert!(y < self.height && x < self.width);
         self.pixels[y][x] = color;
     }
 
     fn at(&self, y: usize, x: usize) -> Color {
         assert!(
-            y < 5 && x < 5,
-            "Can't read X {} Y {} -- out of bounds",
-            x,
-            y
-        );
-        self.pixels[y][x]
-    }
-}
-
-impl Canvas for MediumCanvas {
-    fn width(&self) -> usize {
-        100
-    }
-    fn height(&self) -> usize {
-        100
-    }
-
-    fn write(&mut self, y: usize, x: usize, color: Color) {
-        assert!(y < 100 && x < 100);
-        self.pixels[y][x] = color;
-    }
-
-    fn at(&self, y: usize, x: usize) -> Color {
-        assert!(
-            y < 100 && x < 100,
-            "Can't read X {} Y {} -- out of bounds",
-            x,
-            y
-        );
-        self.pixels[y][x]
-    }
-}
-
-impl Canvas for LargeCanvas {
-    fn width(&self) -> usize {
-        800
-    }
-    fn height(&self) -> usize {
-        600
-    }
-
-    fn write(&mut self, y: usize, x: usize, color: Color) {
-        assert!(y < 600 && x < 800);
-        self.pixels[y][x] = color;
-    }
-
-    fn at(&self, y: usize, x: usize) -> Color {
-        assert!(
-            y < 600 && x < 800,
+            y < self.height && x < self.width,
             "Can't read X {} Y {} -- out of bounds",
             x,
             y
@@ -118,7 +53,7 @@ mod tests {
 
     #[test]
     fn initialize_to_black() {
-        let c = SmallCanvas::new();
+        let c = DynamicCanvas::new(5, 5);
         for x in c.pixels.iter() {
             for &y in x.iter() {
                 assert_eq!(y, Color::new(0.0, 0.0, 0.0));
@@ -128,7 +63,7 @@ mod tests {
 
     #[test]
     fn write_pixel() {
-        let mut c = SmallCanvas::new();
+        let mut c = DynamicCanvas::new(5, 5);
         c.write(2, 4, Color::new(1.0, 0.0, 0.0));
         assert_eq!(c.at(2, 4), Color::new(1.0, 0.0, 0.0));
     }
