@@ -1,4 +1,4 @@
-const EPSILON: f32 = 0.0001;
+pub const EPSILON: f32 = 0.0001;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
@@ -93,11 +93,11 @@ impl Matrix4 {
     pub fn submatrix(&self, row: usize, column: usize) -> Matrix3 {
         let v: Vec<Vec<f32>> = self
             .m
-            .into_iter()
+            .iter()
             .enumerate()
             .filter(|&(i, _)| i != row)
             .map(|(_, cs)| {
-                cs.into_iter()
+                cs.iter()
                     .enumerate()
                     .filter(|&(i, _)| i != column)
                     .map(|(_, v)| *v)
@@ -311,11 +311,11 @@ impl Matrix3 {
     pub fn submatrix(&self, row: usize, column: usize) -> Matrix2 {
         let v: Vec<Vec<f32>> = self
             .m
-            .into_iter()
+            .iter()
             .enumerate()
             .filter(|&(i, _)| i != row)
             .map(|(_, cs)| {
-                cs.into_iter()
+                cs.iter()
                     .enumerate()
                     .filter(|&(i, _)| i != column)
                     .map(|(_, v)| *v)

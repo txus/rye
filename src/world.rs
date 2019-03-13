@@ -2,24 +2,25 @@ use crate::canvas::{Canvas, DynamicCanvas};
 use crate::light::PointLight;
 use crate::materials::Material;
 use crate::primitives::{Color, Matrix, Matrix4, Point, Vector};
-use crate::rays::{Intersection, Precomputation, Ray, Sphere};
+use crate::rays::{Intersection, Precomputation, Ray};
+use crate::shapes::{Shape, Sphere};
 
 pub struct World {
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Box<Shape>>,
     pub light_source: PointLight,
 }
 
 impl World {
     pub fn default() -> Self {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut s1 = Sphere::unit();
-        s1.material = Material {
+        let mut s1: Box<Shape> = Box::from(Sphere::unit());
+        s1.set_material(Material {
             color: Color::new(0.8, 1.0, 0.6),
             diffuse: 0.7,
             specular: 0.2,
-            ..s1.material
-        };
-        let mut s2 = Sphere::unit();
+            ..Material::default()
+        });
+        let mut s2: Box<Shape> = Box::from(Sphere::unit());
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
 
         World {
@@ -38,9 +39,13 @@ impl World {
     }
 
     pub fn shade(&self, c: &Precomputation) -> Color {
-        c.object
-            .material
-            .lighting(&self.light_source, &c.point, &c.eye, &c.normal)
+        c.object.material().lighting(
+            &self.light_source,
+            &c.over_point,
+            &c.eye,
+            &c.normal,
+            self.is_shadowed(c.over_point),
+        )
     }
 
     pub fn color_at(&self, r: &Ray) -> Color {
@@ -48,6 +53,20 @@ impl World {
             self.shade(&i.precompute(&r))
         } else {
             Color::black()
+        }
+    }
+
+    pub fn is_shadowed(&self, p: Point) -> bool {
+        let v = self.light_source.position - p;
+        let distance = v.magnitude();
+        let direction = v.normalize();
+
+        let r = Ray::new(p, direction);
+        let mut intersections = self.intersect(&r);
+
+        match Intersection::hit(&mut intersections) {
+            Some(h) if h.t < distance => true,
+            _ => false,
         }
     }
 }
@@ -66,15 +85,16 @@ impl Camera {
     pub fn new(hsize: u32, vsize: u32, fov: f32) -> Camera {
         let half_view = (fov / 2.0).tan();
         let aspect_ratio = hsize as f32 / vsize as f32;
-        let half_width: f32;
-        let half_height: f32;
-        if aspect_ratio >= 1.0 {
-            half_width = half_view;
-            half_height = half_view / aspect_ratio;
+        let half_width = if aspect_ratio >= 1.0 {
+            half_view
         } else {
-            half_width = half_view * aspect_ratio;
-            half_height = half_view;
-        }
+            half_view * aspect_ratio
+        };
+        let half_height = if aspect_ratio >= 1.0 {
+            half_view / aspect_ratio
+        } else {
+            half_view
+        };
         let pixel_size = (half_width * 2.0) / hsize as f32;
 
         Camera {
@@ -136,7 +156,7 @@ mod tests {
     use super::*;
     use crate::light::PointLight;
     use crate::materials::Material;
-    use crate::primitives::{Color, Point};
+    use crate::primitives::{Color, Matrix4, Point, EPSILON};
 
     use std::f32::consts::PI;
 
@@ -155,8 +175,6 @@ mod tests {
 
         let w = World::default();
         assert_eq!(w.light_source, light);
-        assert_eq!(w.objects.iter().filter(|x| **x == s1).count(), 1);
-        assert_eq!(w.objects.iter().filter(|x| **x == s2).count(), 1);
     }
 
     #[test]
@@ -171,10 +189,10 @@ mod tests {
     fn shading_intersection() {
         let w = World::default();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let shape = w.objects.first().unwrap();
+        let shape: &Box<Shape> = w.objects.first().unwrap();
         let i = Intersection {
             t: 4.0,
-            object: shape,
+            object: &**shape,
         };
         let comps = i.precompute(&r);
         assert_eq!(w.shade(&comps), Color::new(0.38066, 0.47583, 0.2855));
@@ -185,10 +203,10 @@ mod tests {
         let mut w = World::default();
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::new(1.0, 1.0, 1.0));
         let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
-        let shape = w.objects.last().unwrap();
+        let shape: &Box<Shape> = w.objects.last().unwrap();
         let i = Intersection {
             t: 0.5,
-            object: shape,
+            object: &**shape,
         };
         let comps = i.precompute(&r);
         assert_eq!(w.shade(&comps), Color::new(0.90498, 0.90498, 0.90498));
@@ -303,5 +321,64 @@ mod tests {
         c.transform = view_transform(from, to, up);
         let image = c.render(&w);
         assert_eq!(image.at(5, 5), Color::new(0.38066, 0.47583, 0.2855));
+    }
+
+    #[test]
+    fn no_shadow_when_nothing_is_collinear_with_point_and_light() {
+        let w = World::default();
+        let p = Point::new(0.0, 10.0, 0.0);
+        assert_eq!(w.is_shadowed(p), false);
+    }
+
+    #[test]
+    fn shadow_when_object_is_between_light_and_point() {
+        let w = World::default();
+        let p = Point::new(10.0, -10.0, 10.0);
+        assert_eq!(w.is_shadowed(p), true);
+    }
+
+    #[test]
+    fn no_shadow_when_object_is_behind_the_light() {
+        let w = World::default();
+        let p = Point::new(-20.0, 20.0, -20.0);
+        assert_eq!(w.is_shadowed(p), false);
+    }
+
+    #[test]
+    fn no_shadow_when_object_is_behind_the_point() {
+        let w = World::default();
+        let p = Point::new(-2.0, 2.0, -2.0);
+        assert_eq!(w.is_shadowed(p), false);
+    }
+
+    #[test]
+    fn shade_with_intersection_in_shadow() {
+        let mut w = World::default();
+        w.light_source = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let s1 = Sphere::unit();
+        let x = Box::new(s1);
+        let mut s2 = Sphere::unit();
+        let y = Box::new(s2);
+        s2.set_transform(Matrix4::translation(0.0, 0.0, 10.0));
+        w.objects = vec![x, y];
+        let r = Ray::new(Point::new(0.0, 0.0, 5.0), Vector::new(0.0, 0.0, 1.0));
+        let i = Intersection {
+            t: 4.0,
+            object: &s2,
+        };
+        let comps = i.precompute(&r);
+        let color = w.shade(&comps);
+        assert_eq!(color, Color::new(0.1, 0.1, 0.1));
+    }
+
+    #[test]
+    fn hit_should_offset_the_point() {
+        let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+        let mut s = Sphere::unit();
+        s.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
+        let i = Intersection { t: 5.0, object: &s };
+        let comps = i.precompute(&r);
+        assert!(comps.over_point.z < -EPSILON / 2.0);
+        assert!(comps.point.z > comps.over_point.z);
     }
 }

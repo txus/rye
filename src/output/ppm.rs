@@ -1,6 +1,5 @@
 use super::{Canvas, Output};
 use crate::primitives::Color;
-use std::cmp;
 
 pub struct PPM;
 
