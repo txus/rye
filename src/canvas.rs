@@ -1,4 +1,4 @@
-use crate::primitives::Color;
+use crate::color::Color;
 
 pub trait Canvas {
     fn width(&self) -> usize;

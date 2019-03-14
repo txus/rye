@@ -1,7 +1,8 @@
 use crate::canvas::{Canvas, DynamicCanvas};
+use crate::color::Color;
 use crate::light::PointLight;
+use crate::linear::{Matrix, Matrix4, Point, Vector};
 use crate::materials::Material;
-use crate::primitives::{Color, Matrix, Matrix4, Point, Vector};
 use crate::rays::{Intersection, Precomputation, Ray};
 use crate::shapes::{Shape, Sphere};
 
@@ -13,14 +14,14 @@ pub struct World {
 impl World {
     pub fn default() -> Self {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut s1: Box<Shape> = Box::from(Sphere::unit());
+        let mut s1: Box<Shape> = Box::from(Sphere::new());
         s1.set_material(Material {
             color: Color::new(0.8, 1.0, 0.6),
             diffuse: 0.7,
             specular: 0.2,
             ..Material::default()
         });
-        let mut s2: Box<Shape> = Box::from(Sphere::unit());
+        let mut s2: Box<Shape> = Box::from(Sphere::new());
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
 
         World {
@@ -40,6 +41,7 @@ impl World {
 
     pub fn shade(&self, c: &Precomputation) -> Color {
         c.object.material().lighting(
+            c.object,
             &self.light_source,
             &c.over_point,
             &c.eye,
@@ -119,7 +121,7 @@ impl Camera {
         let inv = self.transform.inverse();
 
         let pixel = inv * Point::new(world_x, world_y, -1.0);
-        let origin = inv * Point::new(0.0, 0.0, 0.0);
+        let origin = inv * Point::origin();
         let direction = (pixel - origin).normalize();
 
         Ray::new(origin, direction)
@@ -154,23 +156,24 @@ pub fn view_transform(from: Point, to: Point, up: Vector) -> Matrix4 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::color::Color;
     use crate::light::PointLight;
+    use crate::linear::{Matrix4, Point, EPSILON};
     use crate::materials::Material;
-    use crate::primitives::{Color, Matrix4, Point, EPSILON};
 
     use std::f32::consts::PI;
 
     #[test]
     fn default_world() {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut s1 = Sphere::unit();
+        let mut s1 = Sphere::new();
         s1.material = Material {
             color: Color::new(0.8, 1.0, 0.6),
             diffuse: 0.7,
             specular: 0.2,
             ..s1.material
         };
-        let mut s2 = Sphere::unit();
+        let mut s2 = Sphere::new();
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
 
         let w = World::default();
@@ -202,7 +205,7 @@ mod tests {
     fn shading_intersection_from_inside() {
         let mut w = World::default();
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::new(1.0, 1.0, 1.0));
-        let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
+        let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
         let shape: &Box<Shape> = w.objects.last().unwrap();
         let i = Intersection {
             t: 0.5,
@@ -230,7 +233,7 @@ mod tests {
 
     #[test]
     fn view_transform_default() {
-        let from = Point::new(0.0, 0.0, 0.0);
+        let from = Point::origin();
         let to = Point::new(0.0, 0.0, -10.0);
         let up = Vector::new(0.0, 1.0, 0.0);
         assert_eq!(view_transform(from, to, up), Matrix4::id());
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn view_transform_looking_pos_z_direction() {
-        let from = Point::new(0.0, 0.0, 0.0);
+        let from = Point::origin();
         let to = Point::new(0.0, 0.0, 1.0);
         let up = Vector::new(0.0, 1.0, 0.0);
         assert_eq!(
@@ -250,7 +253,7 @@ mod tests {
     #[test]
     fn view_transform_moves_world() {
         let from = Point::new(0.0, 0.0, 8.0);
-        let to = Point::new(0.0, 0.0, 0.0);
+        let to = Point::origin();
         let up = Vector::new(0.0, 1.0, 0.0);
         assert_eq!(
             view_transform(from, to, up),
@@ -287,7 +290,7 @@ mod tests {
     fn ray_through_center() {
         let c = Camera::new(201, 101, PI / 2.0);
         let r = c.ray_for_pixel(100, 50);
-        assert_eq!(r.origin, Point::new(0.0, 0.0, 0.0));
+        assert_eq!(r.origin, Point::origin());
         assert_eq!(r.direction, Vector::new(0.0, 0.0, -1.0));
     }
 
@@ -295,7 +298,7 @@ mod tests {
     fn ray_through_corner() {
         let c = Camera::new(201, 101, PI / 2.0);
         let r = c.ray_for_pixel(0, 0);
-        assert_eq!(r.origin, Point::new(0.0, 0.0, 0.0));
+        assert_eq!(r.origin, Point::origin());
         assert_eq!(r.direction, Vector::new(0.66519, 0.33259, -0.66851));
     }
 
@@ -315,7 +318,7 @@ mod tests {
     fn camera_render_world() {
         let w = World::default();
         let from = Point::new(0.0, 0.0, -5.0);
-        let to = Point::new(0.0, 0.0, 0.0);
+        let to = Point::origin();
         let up = Vector::new(0.0, 1.0, 0.0);
         let mut c = Camera::new(11, 11, PI / 2.0);
         c.transform = view_transform(from, to, up);
@@ -352,29 +355,9 @@ mod tests {
     }
 
     #[test]
-    fn shade_with_intersection_in_shadow() {
-        let mut w = World::default();
-        w.light_source = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
-        let s1 = Sphere::unit();
-        let x = Box::new(s1);
-        let mut s2 = Sphere::unit();
-        let y = Box::new(s2);
-        s2.set_transform(Matrix4::translation(0.0, 0.0, 10.0));
-        w.objects = vec![x, y];
-        let r = Ray::new(Point::new(0.0, 0.0, 5.0), Vector::new(0.0, 0.0, 1.0));
-        let i = Intersection {
-            t: 4.0,
-            object: &s2,
-        };
-        let comps = i.precompute(&r);
-        let color = w.shade(&comps);
-        assert_eq!(color, Color::new(0.1, 0.1, 0.1));
-    }
-
-    #[test]
     fn hit_should_offset_the_point() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut s = Sphere::unit();
+        let mut s = Sphere::new();
         s.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
         let i = Intersection { t: 5.0, object: &s };
         let comps = i.precompute(&r);

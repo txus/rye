@@ -1,4 +1,4 @@
-use crate::primitives::{Matrix4, Point, Vector, EPSILON};
+use crate::linear::{Matrix4, Point, Vector, EPSILON};
 use crate::shapes::Shape;
 
 pub struct Ray {
@@ -66,9 +66,7 @@ impl<'a> Intersection<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::Matrix;
     use crate::shapes::Sphere;
-    use std::f32::consts::PI;
 
     #[test]
     fn initialize() {
@@ -92,40 +90,8 @@ mod tests {
     }
 
     #[test]
-    fn sphere_intersection() {
-        let mut r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::unit();
-        let mut is = s.intersect(&r);
-        assert_eq!(is.iter().map(|x| x.t).collect::<Vec<f32>>(), vec!(4.0, 6.0));
-
-        r = Ray::new(Point::new(0.0, 1.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        is = s.intersect(&r);
-        assert_eq!(is.iter().map(|x| x.t).collect::<Vec<f32>>(), vec!(5.0, 5.0));
-
-        r = Ray::new(Point::new(0.0, 2.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        assert_eq!(
-            s.intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(),
-            vec!()
-        );
-
-        r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
-        is = s.intersect(&r);
-        assert_eq!(
-            is.iter().map(|x| x.t).collect::<Vec<f32>>(),
-            vec!(-1.0, 1.0)
-        );
-
-        r = Ray::new(Point::new(0.0, 0.0, 5.0), Vector::new(0.0, 0.0, 1.0));
-        is = s.intersect(&r);
-        assert_eq!(
-            is.iter().map(|x| x.t).collect::<Vec<f32>>(),
-            vec!(-6.0, -4.0)
-        );
-    }
-
-    #[test]
     fn intersection_hits() {
-        let s = Sphere::unit();
+        let s = Sphere::new();
         let mut i1 = Intersection { t: 1.0, object: &s };
         let mut i2 = Intersection { t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&mut vec!(i1, i2)).unwrap().t, 1.0);
@@ -162,7 +128,7 @@ mod tests {
     #[test]
     fn hit_when_intersection_occurs_on_outside() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::unit();
+        let s = Sphere::new();
         let i = Intersection { t: 4.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.inside, false);
@@ -170,8 +136,8 @@ mod tests {
 
     #[test]
     fn hit_when_intersection_occurs_on_inside() {
-        let r = Ray::new(Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::unit();
+        let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
+        let s = Sphere::new();
         let i = Intersection { t: 1.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.point, Point::new(0.0, 0.0, 1.0));
@@ -183,7 +149,7 @@ mod tests {
     #[test]
     fn precomputing_state_intersection() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::unit();
+        let s = Sphere::new();
         let i = Intersection { t: 4.0, object: &s };
         let c = i.precompute(&r);
         assert_eq!(c.t, i.t);
@@ -208,70 +174,5 @@ mod tests {
         let r2 = r.transform(m);
         assert_eq!(r2.origin, Point::new(2.0, 6.0, 12.0));
         assert_eq!(r2.direction, Vector::new(0.0, 3.0, 0.0));
-    }
-
-    #[test]
-    fn sphere_transform() {
-        let mut s = Sphere::unit();
-        assert_eq!(s.transform(), Matrix4::id());
-        let t = Matrix4::translation(2.0, 3.0, 4.0);
-        s.set_transform(t);
-        assert_eq!(s.transform(), t);
-    }
-
-    #[test]
-    fn scaled_sphere_intersection() {
-        let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut s = Sphere::unit();
-        s.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
-
-        assert_eq!(
-            s.intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(),
-            vec!(3.0, 7.0)
-        );
-
-        s.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
-        assert_eq!(
-            s.intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>(),
-            vec!()
-        );
-    }
-
-    #[test]
-    fn sphere_normal() {
-        let mut s = Sphere::unit();
-        assert_eq!(
-            s.normal(Point::new(1.0, 0.0, 0.0)),
-            Vector::new(1.0, 0.0, 0.0)
-        );
-        assert_eq!(
-            s.normal(Point::new(0.0, 1.0, 0.0)),
-            Vector::new(0.0, 1.0, 0.0)
-        );
-        assert_eq!(
-            s.normal(Point::new(0.0, 0.0, 1.0)),
-            Vector::new(0.0, 0.0, 1.0)
-        );
-        let v = s.normal(Point::new(
-            3_f32.sqrt() / 3.0,
-            3_f32.sqrt() / 3.0,
-            3_f32.sqrt() / 3.0,
-        ));
-        assert_eq!(v, v.normalize());
-
-        let translate = Matrix4::translation(0.0, 1.0, 0.0);
-        let scale_and_rotate = Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0);
-
-        s.set_transform(translate);
-        assert_eq!(
-            s.normal(Point::new(0.0, 1.70711, -0.70711)),
-            Vector::new(0.0, 0.70711, -0.70711)
-        );
-
-        s.set_transform(scale_and_rotate);
-        assert_eq!(
-            s.normal(Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
-            Vector::new(0.0, 0.970140, -0.24254)
-        );
     }
 }

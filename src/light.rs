@@ -1,4 +1,5 @@
-use crate::primitives::{Color, Point};
+use crate::color::Color;
+use crate::linear::Point;
 
 pub trait Light
 where
@@ -29,7 +30,7 @@ mod tests {
 
     #[test]
     fn initialize() {
-        let pos = Point::new(0.0, 0.0, 0.0);
+        let pos = Point::origin();
         let intensity = Color::new(1.0, 1.0, 1.0);
         let light = PointLight::new(pos, intensity);
         assert_eq!(light.position, pos);

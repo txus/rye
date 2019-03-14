@@ -1,5 +1,5 @@
 use super::{Canvas, Output};
-use crate::primitives::Color;
+use crate::color::Color;
 
 pub struct PPM;
 
@@ -54,7 +54,7 @@ impl Output for PPM {
 mod tests {
     use super::*;
     use crate::canvas::DynamicCanvas;
-    use crate::primitives::Color;
+    use crate::color::Color;
 
     #[test]
     fn scale_test() {
