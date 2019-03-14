@@ -32,6 +32,30 @@ fn main() {
         ..Material::default()
     });
 
+    let mut wall: Box<Shape> = Box::from(Plane::new());
+    wall.set_transform(Matrix4::rotation_x(PI/2.0) * Matrix4::translation(0.0, 0.0, 8.0));
+    wall.set_material(Material {
+        color: Color::new(1.0, 0.9, 0.9),
+        specular: 0.0,
+        pattern: Some(Box::from(CheckerPattern::new(
+            Color::white(),
+            Color::black(),
+        ))),
+        ..Material::default()
+    });
+
+    let mut right_wall: Box<Shape> = Box::from(Plane::new());
+    right_wall.set_transform(Matrix4::rotation_x(PI/2.0) * Matrix4::rotation_z(PI/2.0) * Matrix4::translation(-15.0, 0.0, 0.0));
+    right_wall.set_material(Material {
+        color: Color::new(1.0, 0.9, 0.9),
+        specular: 0.0,
+        pattern: Some(Box::from(CheckerPattern::new(
+            Color::white(),
+            Color::black(),
+        ))),
+        ..Material::default()
+    });
+
     let mut middle: Box<Shape> = Box::from(Sphere::new());
     middle.set_transform(Matrix4::translation(-0.5, 1.0, 0.5));
     middle.set_material(Material {
@@ -69,13 +93,13 @@ fn main() {
 
     let mut world = World::default();
     world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-    world.objects = vec![floor, middle, right, left];
+    world.objects = vec![wall, right_wall, middle, right, left, floor];
 
-    let mut camera = Camera::new(200, 100, PI / 3.0);
+    let mut camera = Camera::new(500, 250, PI / 1.8);
     camera.transform = view_transform(
-        Point::new(0.0, 1.5, -5.0),
-        Point::new(0.0, 1.0, 0.0),
-        Vector::new(0.0, 1.0, 0.0),
+        Point::new(-2.0, 1.5, -3.5),
+        Point::new(1.0, 1.0, 0.0),
+        Vector::new(0.0, 0.8, 0.3),
     );
 
     let canvas = camera.render(&world);
