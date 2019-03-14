@@ -1,3 +1,4 @@
+mod camera;
 mod canvas;
 mod color;
 mod light;
@@ -8,13 +9,14 @@ mod patterns;
 mod rays;
 mod shapes;
 mod world;
+use camera::{view_transform, Camera};
 use color::Color;
 use light::PointLight;
 use linear::{Matrix4, Point, Vector};
 use materials::Material;
 use patterns::{CheckerPattern, GradientPattern, RingPattern, StripePattern};
 use shapes::{Plane, Shape, Sphere};
-use world::{view_transform, Camera, World};
+use world::World;
 
 use std::f32::consts::PI;
 
@@ -44,7 +46,7 @@ fn main() {
     });
 
     let mut right: Box<Shape> = Box::from(Sphere::new());
-    right.set_transform(Matrix4::translation(1.5, 0.5, -0.5) * Matrix4::scaling(2.5, 2.5, 2.5));
+    right.set_transform(Matrix4::translation(1.5, 0.5, -0.5) * Matrix4::scaling(0.5, 0.5, 0.5));
     right.set_material(Material {
         color: Color::new(0.5, 1.0, 0.1),
         diffuse: 0.7,
@@ -66,8 +68,8 @@ fn main() {
     });
 
     let mut world = World::default();
-    world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
-    world.objects = vec![middle, right, left];
+    world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
+    world.objects = vec![floor, middle, right, left];
 
     let mut camera = Camera::new(200, 100, PI / 3.0);
     camera.transform = view_transform(

@@ -31,7 +31,7 @@ mod tests {
     #[test]
     fn initialize() {
         let pos = Point::origin();
-        let intensity = Color::new(1.0, 1.0, 1.0);
+        let intensity = Color::white();
         let light = PointLight::new(pos, intensity);
         assert_eq!(light.position, pos);
         assert_eq!(light.intensity, intensity);

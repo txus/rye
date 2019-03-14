@@ -54,9 +54,9 @@ mod tests {
     #[test]
     fn initialize_to_black() {
         let c = DynamicCanvas::new(5, 5);
-        for x in c.pixels.iter() {
-            for &y in x.iter() {
-                assert_eq!(y, Color::new(0.0, 0.0, 0.0));
+        for y in c.pixels.iter() {
+            for &x in y.iter() {
+                assert_eq!(x, Color::black());
             }
         }
     }
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn write_pixel() {
         let mut c = DynamicCanvas::new(5, 5);
-        c.write(2, 4, Color::new(1.0, 0.0, 0.0));
-        assert_eq!(c.at(2, 4), Color::new(1.0, 0.0, 0.0));
+        c.write(2, 4, Color::red());
+        assert_eq!(c.at(2, 4), Color::red());
     }
 }

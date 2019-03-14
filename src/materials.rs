@@ -33,7 +33,7 @@ impl Material {
     }
 
     pub fn default() -> Material {
-        Self::new(Color::new(1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0, None)
+        Self::new(Color::white(), 0.1, 0.9, 0.9, 200.0, None)
     }
 
     pub fn lighting(
@@ -93,7 +93,7 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
         let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
     }
@@ -105,9 +105,9 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
         let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
-        assert_eq!(result, Color::new(1.0, 1.0, 1.0));
+        assert_eq!(result, Color::white());
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::white());
         let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
     }
@@ -129,7 +129,7 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, -2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::white());
         let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364));
     }
@@ -141,7 +141,7 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::white());
         let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
@@ -153,7 +153,7 @@ mod tests {
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
         let in_shadow = true;
         let result = mat.lighting(&s, &light, &position, &eye, &normal, in_shadow);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
@@ -172,7 +172,7 @@ mod tests {
         mat.specular = 0.0;
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
-        let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::new(1.0, 1.0, 1.0));
+        let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::white());
         let c1 = mat.lighting(&s, &light, &Point::new(0.9, 0.0, 0.0), &eye, &normal, false);
         let c2 = mat.lighting(&s, &light, &Point::new(1.1, 0.0, 0.0), &eye, &normal, false);
         assert_eq!(c1, Color::white());

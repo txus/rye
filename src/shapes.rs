@@ -248,7 +248,7 @@ mod tests {
             );
         }
         #[test]
-        fn intersect_with_complanar_ray() {
+        fn intersect_with_coplanar_ray() {
             let p = Plane::new();
             let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
             assert_eq!(
