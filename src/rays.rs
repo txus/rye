@@ -15,8 +15,8 @@ impl Ray {
         self.origin + self.direction * t
     }
 
-    pub fn transform(&self, transform: Matrix4) -> Ray {
-        Ray::new(transform * self.origin, transform * self.direction)
+    pub fn transform(&self, transform: &Matrix4) -> Ray {
+        Ray::new(*transform * self.origin, *transform * self.direction)
     }
 }
 
@@ -111,9 +111,9 @@ mod tests {
             t: -1.0,
             object: &s,
         };
-        // dont' know how to do it
-        //let x: Option<Intersection> = None;
-        //assert_eq!(Intersection::hit(&mut vec!(i1, i2)), x);
+        if let Some(_) = Intersection::hit(&mut vec![i1, i2]) {
+            assert!(false, "Something intersected when it shouldn't have")
+        }
 
         i1 = Intersection { t: 5.0, object: &s };
         i2 = Intersection { t: 7.0, object: &s };
@@ -162,7 +162,7 @@ mod tests {
     fn translation() {
         let r = Ray::new(Point::new(1.0, 2.0, 3.0), Vector::new(0.0, 1.0, 0.0));
         let m = Matrix4::translation(3.0, 4.0, 5.0);
-        let r2 = r.transform(m);
+        let r2 = r.transform(&m);
         assert_eq!(r2.origin, Point::new(4.0, 6.0, 8.0));
         assert_eq!(r2.direction, Vector::new(0.0, 1.0, 0.0));
     }
@@ -171,7 +171,7 @@ mod tests {
     fn scaling() {
         let r = Ray::new(Point::new(1.0, 2.0, 3.0), Vector::new(0.0, 1.0, 0.0));
         let m = Matrix4::scaling(2.0, 3.0, 4.0);
-        let r2 = r.transform(m);
+        let r2 = r.transform(&m);
         assert_eq!(r2.origin, Point::new(2.0, 6.0, 12.0));
         assert_eq!(r2.direction, Vector::new(0.0, 3.0, 0.0));
     }

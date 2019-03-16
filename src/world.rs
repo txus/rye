@@ -11,17 +11,27 @@ pub struct World {
 }
 
 impl World {
-    pub fn default() -> Self {
-        let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut s1: Box<Shape> = Box::from(Sphere::new());
+    pub fn default_sphere1() -> Sphere {
+        let mut s1 = Sphere::new();
         s1.set_material(Material {
             color: Color::new(0.8, 1.0, 0.6),
             diffuse: 0.7,
             specular: 0.2,
             ..Material::default()
         });
-        let mut s2: Box<Shape> = Box::from(Sphere::new());
+        s1
+    }
+
+    pub fn default_sphere2() -> Sphere {
+        let mut s2 = Sphere::new();
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
+        s2
+    }
+
+    pub fn default() -> Self {
+        let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
+        let s1: Box<Shape> = Box::from(Self::default_sphere1());
+        let s2: Box<Shape> = Box::from(Self::default_sphere2());
 
         World {
             objects: vec![s1, s2],
@@ -45,24 +55,25 @@ impl World {
             &c.over_point,
             &c.eye,
             &c.normal,
-            self.is_shadowed(c.over_point),
+            self.is_shadowed(&c.over_point),
         )
     }
 
     pub fn color_at(&self, r: &Ray) -> Color {
-        if let Some(i) = self.intersect(&r).first() {
-            self.shade(&i.precompute(&r))
+        let mut intersections = self.intersect(&r);
+        if let Some(hit) = Intersection::hit(&mut intersections) {
+            self.shade(&hit.precompute(&r))
         } else {
             Color::black()
         }
     }
 
-    pub fn is_shadowed(&self, p: Point) -> bool {
-        let v = self.light_source.position - p;
+    pub fn is_shadowed(&self, p: &Point) -> bool {
+        let v = self.light_source.position - *p;
         let distance = v.magnitude();
         let direction = v.normalize();
 
-        let r = Ray::new(p, direction);
+        let r = Ray::new(*p, direction);
         let mut intersections = self.intersect(&r);
 
         match Intersection::hit(&mut intersections) {
@@ -103,6 +114,17 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let hits = w.intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
         assert_eq!(hits, vec!(4.0, 4.5, 5.5, 6.0));
+    }
+
+    #[test]
+    fn precomputing_state_of_intersection() {
+        let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+        let s = Sphere::new();
+        let i = Intersection { t: 4.0, object: &s };
+        let comps = i.precompute(&r);
+        assert_eq!(comps.point, Point::new(0.0, 0.0, -1.0));
+        assert_eq!(comps.eye, Vector::new(0.0, 0.0, -1.0));
+        assert_eq!(comps.normal, Vector::new(0.0, 0.0, -1.0));
     }
 
     #[test]
@@ -152,28 +174,28 @@ mod tests {
     fn no_shadow_when_nothing_is_collinear_with_point_and_light() {
         let w = World::default();
         let p = Point::new(0.0, 10.0, 0.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&p), false);
     }
 
     #[test]
     fn shadow_when_object_is_between_light_and_point() {
         let w = World::default();
         let p = Point::new(10.0, -10.0, 10.0);
-        assert_eq!(w.is_shadowed(p), true);
+        assert_eq!(w.is_shadowed(&p), true);
     }
 
     #[test]
     fn no_shadow_when_object_is_behind_the_light() {
         let w = World::default();
         let p = Point::new(-20.0, 20.0, -20.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&p), false);
     }
 
     #[test]
     fn no_shadow_when_object_is_behind_the_point() {
         let w = World::default();
         let p = Point::new(-2.0, 2.0, -2.0);
-        assert_eq!(w.is_shadowed(p), false);
+        assert_eq!(w.is_shadowed(&p), false);
     }
 
     #[test]

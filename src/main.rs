@@ -1,3 +1,4 @@
+extern crate rayon;
 mod camera;
 mod canvas;
 mod color;
@@ -33,7 +34,7 @@ fn main() {
     });
 
     let mut wall: Box<Shape> = Box::from(Plane::new());
-    wall.set_transform(Matrix4::rotation_x(PI/2.0) * Matrix4::translation(0.0, 0.0, 8.0));
+    wall.set_transform(Matrix4::rotation_x(PI / 2.0) * Matrix4::translation(0.0, 0.0, 8.0));
     wall.set_material(Material {
         color: Color::new(1.0, 0.9, 0.9),
         specular: 0.0,
@@ -45,7 +46,11 @@ fn main() {
     });
 
     let mut right_wall: Box<Shape> = Box::from(Plane::new());
-    right_wall.set_transform(Matrix4::rotation_x(PI/2.0) * Matrix4::rotation_z(PI/2.0) * Matrix4::translation(-15.0, 0.0, 0.0));
+    right_wall.set_transform(
+        Matrix4::rotation_x(PI / 2.0)
+            * Matrix4::rotation_z(PI / 2.0)
+            * Matrix4::translation(-15.0, 0.0, 0.0),
+    );
     right_wall.set_material(Material {
         color: Color::new(1.0, 0.9, 0.9),
         specular: 0.0,
@@ -59,6 +64,19 @@ fn main() {
     let mut middle: Box<Shape> = Box::from(Sphere::new());
     middle.set_transform(Matrix4::translation(-0.5, 1.0, 0.5));
     middle.set_material(Material {
+        color: Color::new(0.1, 1.0, 0.5),
+        diffuse: 0.7,
+        specular: 0.3,
+        pattern: Some(Box::from(GradientPattern::new(
+            Color::green(),
+            Color::blue(),
+        ))),
+        ..Material::default()
+    });
+
+    let mut up: Box<Shape> = Box::from(Sphere::new());
+    up.set_transform(Matrix4::translation(-0.5, 3.0, 0.5));
+    up.set_material(Material {
         color: Color::new(0.1, 1.0, 0.5),
         diffuse: 0.7,
         specular: 0.3,
@@ -93,7 +111,7 @@ fn main() {
 
     let mut world = World::default();
     world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-    world.objects = vec![wall, right_wall, middle, right, left, floor];
+    world.objects = vec![middle, right, left, up, floor, wall, right_wall];
 
     let mut camera = Camera::new(500, 250, PI / 1.8);
     camera.transform = view_transform(

@@ -170,17 +170,23 @@ impl Matrix4 {
     }
 }
 
+const ID: Matrix4 = Matrix4 {
+    m: [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ],
+};
+
 impl Matrix for Matrix4 {
+    #[inline(always)]
     fn at(&self, row: usize, column: usize) -> f32 {
         self.m[row][column]
     }
+    #[inline(always)]
     fn id() -> Self {
-        Self::new([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ])
+        ID
     }
 }
 
@@ -223,6 +229,7 @@ impl std::cmp::PartialEq for Matrix2 {
     }
 }
 
+#[inline(always)]
 fn c(a: &Matrix4, b: &Matrix4, row: usize, column: usize) -> f32 {
     a.at(row, 0) * b.at(0, column)
         + a.at(row, 1) * b.at(1, column)

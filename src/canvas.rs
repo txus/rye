@@ -10,7 +10,7 @@ pub trait Canvas {
 pub struct DynamicCanvas {
     width: usize,
     height: usize,
-    pixels: Vec<Vec<Color>>,
+    pub pixels: Vec<Vec<Color>>,
 }
 
 impl DynamicCanvas {

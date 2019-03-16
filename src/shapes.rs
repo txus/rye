@@ -2,14 +2,15 @@ use crate::linear::{Matrix, Matrix4, Point, Vector, EPSILON};
 use crate::materials::Material;
 use crate::rays::{Intersection, Ray};
 
-pub trait Shape {
+pub trait Shape: Send + Sync {
     fn transform(&self) -> &Matrix4;
+    fn inverse_transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
     fn material(&self) -> &Material;
     fn set_material(&mut self, m: Material);
     fn normal(&self, world_point: Point) -> Vector {
-        let inverse = self.transform().inverse();
-        let object_point = inverse * world_point;
+        let inverse = self.inverse_transform();
+        let object_point = *inverse * world_point;
         let object_normal = self.local_normal_at(&object_point);
         let world_normal = inverse.transpose() * object_normal;
         world_normal.normalize()
@@ -17,7 +18,7 @@ pub trait Shape {
     fn local_normal_at(&self, p: &Point) -> Vector;
     fn local_intersect(&self, ray: &Ray) -> Vec<Intersection>;
     fn intersect(&self, r: &Ray) -> Vec<Intersection> {
-        let ray = r.transform(self.transform().inverse());
+        let ray = r.transform(self.inverse_transform());
         self.local_intersect(&ray)
     }
 }
@@ -25,6 +26,7 @@ pub trait Shape {
 pub struct Sphere {
     pub transform: Matrix4,
     pub material: Material,
+    pub inverse_transform: Matrix4,
 }
 
 impl Sphere {
@@ -32,16 +34,21 @@ impl Sphere {
         Sphere {
             material: Material::default(),
             transform: Matrix4::id(),
+            inverse_transform: Matrix4::id().inverse(),
         }
     }
 }
 
 impl Shape for Sphere {
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
     fn transform(&self) -> &Matrix4 {
         &self.transform
     }
     fn set_transform(&mut self, t: Matrix4) {
-        self.transform = t
+        self.transform = t;
+        self.inverse_transform = t.inverse();
     }
     fn material(&self) -> &Material {
         &self.material
@@ -86,6 +93,7 @@ impl Shape for Sphere {
 pub struct Plane {
     transform: Matrix4,
     material: Material,
+    inverse_transform: Matrix4,
 }
 
 impl Plane {
@@ -93,13 +101,15 @@ impl Plane {
         Plane {
             transform: Matrix4::id(),
             material: Material::default(),
+            inverse_transform: Matrix4::id().inverse(),
         }
     }
 }
 
 impl Shape for Plane {
     fn set_transform(&mut self, t: Matrix4) {
-        self.transform = t
+        self.transform = t;
+        self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
         self.material = m
@@ -110,6 +120,9 @@ impl Shape for Plane {
     fn transform(&self) -> &Matrix4 {
         &self.transform
     }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
     fn local_normal_at(&self, _p: &Point) -> Vector {
         Vector::new(0.0, 1.0, 0.0)
     }
@@ -117,7 +130,7 @@ impl Shape for Plane {
         if ray.direction.y.abs() < EPSILON {
             vec![]
         } else {
-            let t = -ray.origin.y / ray.direction.y;
+            let t = -(ray.origin.y) / ray.direction.y;
             let shape: &Shape = self;
             vec![Intersection { t, object: shape }]
         }
@@ -131,6 +144,7 @@ mod tests {
 
     struct TestShape {
         transform: Matrix4,
+        inverse_transform: Matrix4,
         material: Material,
         expected_ray: Ray,
     }
@@ -140,6 +154,7 @@ mod tests {
             TestShape {
                 transform: Matrix4::id(),
                 material: Material::default(),
+                inverse_transform: Matrix4::id().inverse(),
                 expected_ray,
             }
         }
@@ -152,12 +167,15 @@ mod tests {
         fn material(&self) -> &Material {
             &self.material
         }
-
         fn set_transform(&mut self, t: Matrix4) {
             self.transform = t;
+            self.inverse_transform = t.inverse();
         }
         fn transform(&self) -> &Matrix4 {
             &self.transform
+        }
+        fn inverse_transform(&self) -> &Matrix4 {
+            &self.inverse_transform
         }
 
         fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {

@@ -2,7 +2,7 @@ use crate::color::Color;
 use crate::linear::{Matrix, Matrix4, Point};
 use crate::shapes::Shape;
 
-pub trait Pattern {
+pub trait Pattern: Send + Sync {
     fn transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
     fn color_at(&self, p: &Point) -> Color;

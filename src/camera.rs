@@ -3,6 +3,10 @@ use crate::linear::{Matrix, Matrix4, Point, Vector};
 use crate::rays::Ray;
 use crate::world::World;
 
+use std::env;
+
+use rayon::prelude::*;
+
 pub struct Camera {
     hsize: u32,
     vsize: u32,
@@ -57,13 +61,37 @@ impl Camera {
 
     pub fn render(&self, world: &World) -> DynamicCanvas {
         let mut canvas = DynamicCanvas::new(self.hsize as usize, self.vsize as usize);
-        for y in 0..self.vsize {
-            for x in 0..self.hsize {
-                let ray = self.ray_for_pixel(x, y);
-                let color = world.color_at(&ray);
-                canvas.write(y as usize, x as usize, color);
+
+        if let Ok(_) = env::var("FAST") {
+            canvas
+                .pixels
+                .par_iter_mut()
+                .enumerate()
+                .chunks(10)
+                .for_each(|chunk| {
+                    for (y, row) in chunk {
+                        row.par_iter_mut()
+                            .enumerate()
+                            .chunks(20)
+                            .for_each(|inner_chunk| {
+                                for (x, pixel) in inner_chunk {
+                                    let ray = self.ray_for_pixel(x as u32, y as u32);
+                                    let color = world.color_at(&ray);
+                                    *pixel = color;
+                                }
+                            })
+                    }
+                });
+        } else {
+            for y in 0..self.vsize {
+                for x in 0..self.hsize {
+                    let ray = self.ray_for_pixel(x, y);
+                    let color = world.color_at(&ray);
+                    canvas.write(y as usize, x as usize, color);
+                }
             }
         }
+
         canvas
     }
 }
