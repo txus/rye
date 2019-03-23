@@ -21,11 +21,12 @@ use world::World;
 
 use std::f32::consts::PI;
 
-fn main() {
+fn scene1() {
     let mut floor: Box<Shape> = Box::from(Plane::new());
     floor.set_material(Material {
         color: Color::new(1.0, 0.9, 0.9),
         specular: 0.0,
+        reflective: 0.5,
         pattern: Some(Box::from(CheckerPattern::new(
             Color::white(),
             Color::black(),
@@ -67,19 +68,7 @@ fn main() {
         color: Color::new(0.1, 1.0, 0.5),
         diffuse: 0.7,
         specular: 0.3,
-        pattern: Some(Box::from(GradientPattern::new(
-            Color::green(),
-            Color::blue(),
-        ))),
-        ..Material::default()
-    });
-
-    let mut up: Box<Shape> = Box::from(Sphere::new());
-    up.set_transform(Matrix4::translation(-0.5, 3.0, 0.5));
-    up.set_material(Material {
-        color: Color::new(0.1, 1.0, 0.5),
-        diffuse: 0.7,
-        specular: 0.3,
+        reflective: 1.0,
         pattern: Some(Box::from(GradientPattern::new(
             Color::green(),
             Color::blue(),
@@ -111,9 +100,9 @@ fn main() {
 
     let mut world = World::default();
     world.light_source = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-    world.objects = vec![middle, right, left, up, floor, wall, right_wall];
+    world.objects = vec![middle, right, left, floor, wall];
 
-    let mut camera = Camera::new(500, 250, PI / 1.8);
+    let mut camera = Camera::new(800, 600, PI / 1.8);
     camera.transform = view_transform(
         Point::new(-2.0, 1.5, -3.5),
         Point::new(1.0, 1.0, 0.0),
@@ -123,4 +112,34 @@ fn main() {
     let canvas = camera.render(&world);
 
     output::render(&canvas, output::ppm::PPM {}, "/tmp/scene.ppm");
+}
+
+fn main() {
+    let mut floor = Plane::new();
+    floor.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
+    floor.material.transparency = 0.5;
+    floor.material.refractive_index = 1.5;
+
+    let mut ball = Sphere::new();
+    ball.set_material(Material {
+        color: Color::new(1.0, 0.0, 0.0),
+        ambient: 0.5,
+        ..Material::default()
+    });
+    ball.set_transform(Matrix4::translation(0.0, -3.5, -0.5));
+
+    let mut world = World::default();
+    world.objects.push(Box::from(floor));
+    world.objects.push(Box::from(ball));
+
+    let mut camera = Camera::new(200, 150, PI / 1.8);
+    camera.transform = view_transform(
+        Point::new(0.0, 1.5, -3.5),
+        Point::new(0.0, 0.0, 0.0),
+        Vector::new(0.0, 1.0, 0.0),
+    );
+
+    let canvas = camera.render(&world);
+
+    output::render(&canvas, output::ppm::PPM {}, "/tmp/refraction.ppm");
 }

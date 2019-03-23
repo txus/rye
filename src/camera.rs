@@ -1,7 +1,7 @@
 use crate::canvas::{Canvas, DynamicCanvas};
 use crate::linear::{Matrix, Matrix4, Point, Vector};
 use crate::rays::Ray;
-use crate::world::World;
+use crate::world::{MAX_REFLECTIONS, World};
 
 use std::env;
 
@@ -76,7 +76,7 @@ impl Camera {
                             .for_each(|inner_chunk| {
                                 for (x, pixel) in inner_chunk {
                                     let ray = self.ray_for_pixel(x as u32, y as u32);
-                                    let color = world.color_at(&ray);
+                                    let color = world.color_at(&ray, MAX_REFLECTIONS);
                                     *pixel = color;
                                 }
                             })
@@ -86,7 +86,7 @@ impl Camera {
             for y in 0..self.vsize {
                 for x in 0..self.hsize {
                     let ray = self.ray_for_pixel(x, y);
-                    let color = world.color_at(&ray);
+                    let color = world.color_at(&ray, MAX_REFLECTIONS);
                     canvas.write(y as usize, x as usize, color);
                 }
             }

@@ -10,30 +10,25 @@ pub struct Material {
     pub diffuse: f32,
     pub specular: f32,
     pub shininess: f32,
+    pub reflective: f32,
+    pub transparency: f32,
+    pub refractive_index: f32,
     pub pattern: Option<Box<Pattern>>,
 }
 
 impl Material {
-    pub fn new(
-        color: Color,
-        ambient: f32,
-        diffuse: f32,
-        specular: f32,
-        shininess: f32,
-        pattern: Option<Box<Pattern>>,
-    ) -> Material {
-        Material {
-            color,
-            ambient,
-            diffuse,
-            specular,
-            shininess,
-            pattern,
-        }
-    }
-
     pub fn default() -> Material {
-        Self::new(Color::white(), 0.1, 0.9, 0.9, 200.0, None)
+        Material {
+            color: Color::white(),
+            ambient: 0.1,
+            diffuse: 0.9,
+            specular: 0.9,
+            shininess: 200.0,
+            reflective: 0.0,
+            transparency: 0.0,
+            refractive_index: 1.0,
+            pattern: None
+        }
     }
 
     pub fn lighting(

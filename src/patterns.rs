@@ -49,6 +49,32 @@ impl Pattern for StripePattern {
     }
 }
 
+pub struct TestPattern {
+    pub transform: Matrix4
+}
+
+impl TestPattern {
+    pub fn new() -> TestPattern {
+        TestPattern {
+            transform: Matrix4::id(),
+        }
+    }
+}
+
+impl Pattern for TestPattern {
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+    }
+
+    fn color_at(&self, p: &Point) -> Color {
+        Color::new(p.x, p.y, p.z)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GradientPattern {
     a: Color,

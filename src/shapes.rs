@@ -2,7 +2,15 @@ use crate::linear::{Matrix, Matrix4, Point, Vector, EPSILON};
 use crate::materials::Material;
 use crate::rays::{Intersection, Ray};
 
+use rand::Rng;
+
+fn gen_id() -> i32 {
+    let mut rng = rand::thread_rng();
+    rng.gen()
+}
+
 pub trait Shape: Send + Sync {
+    fn id(&self) -> i32;
     fn transform(&self) -> &Matrix4;
     fn inverse_transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
@@ -23,7 +31,14 @@ pub trait Shape: Send + Sync {
     }
 }
 
+impl std::cmp::PartialEq for Shape {
+    fn eq(&self, other: &Shape) -> bool {
+        self.id() == other.id()
+    }
+}
+
 pub struct Sphere {
+    pub id: i32,
     pub transform: Matrix4,
     pub material: Material,
     pub inverse_transform: Matrix4,
@@ -32,14 +47,31 @@ pub struct Sphere {
 impl Sphere {
     pub fn new() -> Self {
         Sphere {
+            id: gen_id(),
             material: Material::default(),
             transform: Matrix4::id(),
             inverse_transform: Matrix4::id().inverse(),
         }
     }
+
+    pub fn glass() -> Self {
+        Sphere {
+            id: gen_id(),
+            material: Material {
+                transparency: 1.0,
+                refractive_index: 1.5,
+                ..Material::default()
+            },
+            transform: Matrix4::id(),
+            inverse_transform: Matrix4::id().inverse()
+        }
+    }
 }
 
 impl Shape for Sphere {
+    fn id(&self) -> i32 {
+        self.id
+    }
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
@@ -91,14 +123,16 @@ impl Shape for Sphere {
 }
 
 pub struct Plane {
-    transform: Matrix4,
-    material: Material,
+    pub id: i32,
+    pub transform: Matrix4,
+    pub material: Material,
     inverse_transform: Matrix4,
 }
 
 impl Plane {
     pub fn new() -> Plane {
         Plane {
+            id: gen_id(),
             transform: Matrix4::id(),
             material: Material::default(),
             inverse_transform: Matrix4::id().inverse(),
@@ -107,6 +141,9 @@ impl Plane {
 }
 
 impl Shape for Plane {
+    fn id(&self) -> i32 {
+        self.id
+    }
     fn set_transform(&mut self, t: Matrix4) {
         self.transform = t;
         self.inverse_transform = t.inverse();
@@ -161,6 +198,9 @@ mod tests {
     }
 
     impl Shape for TestShape {
+        fn id(&self) -> i32 {
+            0
+        }
         fn set_material(&mut self, m: Material) {
             self.material = m;
         }
