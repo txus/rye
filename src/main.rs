@@ -16,7 +16,7 @@ use light::PointLight;
 use linear::{Matrix4, Point, Vector};
 use materials::Material;
 use patterns::{CheckerPattern, GradientPattern, RingPattern, StripePattern};
-use shapes::{Plane, Shape, Sphere};
+use shapes::{Plane, Cube, Shape, Sphere};
 use world::World;
 
 use std::f32::consts::PI;
@@ -115,10 +115,14 @@ fn scene1() {
 }
 
 fn main() {
+    let mut cube = Cube::new();
+    cube.set_transform(Matrix4::rotation_y(PI/1.3) * Matrix4::translation(0.0, 1.5, 1.5));
+    cube.material.reflective = 1.0;
+    cube.material.color = Color::blue();
+    cube.casts_shadows = false;
+
     let mut floor = Plane::new();
-    floor.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
-    floor.material.transparency = 0.5;
-    floor.material.refractive_index = 1.5;
+    floor.material.pattern = Some(Box::from(CheckerPattern::new(Color::white(), Color::black())));
 
     let mut ball = Sphere::new();
     ball.set_material(Material {
@@ -126,13 +130,14 @@ fn main() {
         ambient: 0.5,
         ..Material::default()
     });
-    ball.set_transform(Matrix4::translation(0.0, -3.5, -0.5));
+    ball.set_transform(Matrix4::translation(-1.5, 0.5, -0.5));
 
     let mut world = World::default();
     world.objects.push(Box::from(floor));
     world.objects.push(Box::from(ball));
+    world.objects.push(Box::from(cube));
 
-    let mut camera = Camera::new(200, 150, PI / 1.8);
+    let mut camera = Camera::new(200, 150, PI / 2.2);
     camera.transform = view_transform(
         Point::new(0.0, 1.5, -3.5),
         Point::new(0.0, 0.0, 0.0),

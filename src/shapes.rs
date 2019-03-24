@@ -2,6 +2,8 @@ use crate::linear::{Matrix, Matrix4, Point, Vector, EPSILON};
 use crate::materials::Material;
 use crate::rays::{Intersection, Ray};
 
+use std::f32::INFINITY;
+
 use rand::Rng;
 
 fn gen_id() -> i32 {
@@ -182,6 +184,97 @@ impl Shape for Plane {
             let t = -(ray.origin.y) / ray.direction.y;
             let shape: &Shape = self;
             vec![Intersection { t, object: shape }]
+        }
+    }
+}
+
+pub struct Cube {
+    pub id: i32,
+    pub transform: Matrix4,
+    pub material: Material,
+    pub casts_shadows: bool,
+    inverse_transform: Matrix4,
+}
+
+impl Cube {
+    pub fn new() -> Cube {
+        Cube {
+            id: gen_id(),
+            transform: Matrix4::id(),
+            material: Material::default(),
+            casts_shadows: true,
+            inverse_transform: Matrix4::id().inverse(),
+        }
+    }
+}
+
+fn check_axis(origin: f32, direction: f32) -> (f32, f32) {
+    let tmin_numerator = -1.0 - origin;
+    let tmax_numerator = 1.0 - origin;
+
+    let (tmin, tmax) = if direction.abs() >= EPSILON {
+        (tmin_numerator / direction, tmax_numerator / direction)
+    } else {
+        (tmin_numerator * INFINITY, tmax_numerator * INFINITY)
+    };
+
+    if tmin > tmax {
+        (tmax, tmin)
+    } else {
+        (tmin, tmax)
+    }
+}
+
+impl Shape for Cube {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = m
+    }
+    fn material(&self) -> &Material {
+        &self.material
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point) -> Vector {
+        let (x, y, z) = (p.x.abs(), p.y.abs(), p.z.abs());
+        let maxc = x.max(y).max(z);
+        if maxc == x {
+            Vector::new(p.x, 0.0, 0.0)
+        } else if maxc == y {
+            Vector::new(0.0, p.y, 0.0)
+        } else {
+            Vector::new(0.0, 0.0, p.z)
+        }
+    }
+    fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
+        let (xtmin, xtmax) = check_axis(ray.origin.x, ray.direction.x);
+        let (ytmin, ytmax) = check_axis(ray.origin.y, ray.direction.y);
+        let (ztmin, ztmax) = check_axis(ray.origin.z, ray.direction.z);
+
+        let tmin = xtmin.max(ytmin).max(ztmin);
+        let tmax = xtmax.min(ytmax).min(ztmax);
+
+        if tmin > tmax {
+            vec![]
+        } else {
+            let shape: &Shape = self;
+            vec![
+                Intersection { t: tmin, object: shape },
+                Intersection { t: tmax, object: shape }
+            ]
         }
     }
 }
@@ -458,6 +551,69 @@ mod tests {
                 is.iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec!(-6.0, -4.0)
             );
+        }
+    }
+
+    mod cube {
+        use super::*;
+
+        #[test]
+        fn intersection() {
+            let c = Cube::new();
+            let examples = [
+                // origin, direction, t1, t2
+                (Point::new(5.0, 0.5, 0.0), Vector::new(-1.0, 0.0, 0.0), 4.0, 6.0),
+                (Point::new(-5.0, 0.5, 0.0), Vector::new(1.0, 0.0, 0.0), 4.0, 6.0),
+                (Point::new(0.5, 5.0, 0.0), Vector::new(0.0, -1.0, 0.0), 4.0, 6.0),
+                (Point::new(0.5, -5.0, 0.0), Vector::new(0.0, 1.0, 0.0), 4.0, 6.0),
+                (Point::new(0.5, 0.0, 5.0), Vector::new(0.0, 0.0, -1.0), 4.0, 6.0),
+                (Point::new(0.5, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 4.0, 6.0),
+                (Point::new(0.0, 0.5, 0.0), Vector::new(0.0, 0.0, 1.0), -1.0, 1.0),
+            ];
+
+            for (origin, direction, t1, t2) in &examples {
+                let r = Ray::new(*origin, *direction);
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits, [*t1, *t2]);
+            }
+        }
+
+        #[test]
+        fn ray_misses_cube() {
+            let c = Cube::new();
+            let examples = [
+                (Point::new(-2.0, 0.0, 0.0), Vector::new(0.2673, 0.5345, 0.8018)),
+                (Point::new(0.0, -2.0, 0.0), Vector::new(0.8018, 0.2673, 0.5345)),
+                (Point::new(0.0, 0.0, -2.0), Vector::new(0.5345, 0.8018, 0.2673)),
+                (Point::new(2.0, 0.0, 2.0), Vector::new(0.0, 0.0, -1.0)),
+                (Point::new(0.0, 2.0, 2.0), Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(2.0, 2.0, 0.0), Vector::new(-1.0, 0.0, 0.0))
+            ];
+
+            for (origin, direction) in &examples {
+                let r = Ray::new(*origin, *direction);
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits, []);
+            }
+        }
+
+        #[test]
+        fn normal_on_surface() {
+            let c = Cube::new();
+            let examples = [
+                (Point::new(1.0, 0.5, -0.8)  , Vector::new(1.0, 0.0, 0.0) ),
+                (Point::new(-1.0, -0.2, 0.9) , Vector::new(-1.0, 0.0, 0.0)),
+                (Point::new(-0.4, 1.0, -0.1) , Vector::new(0.0, 1.0, 0.0) ),
+                (Point::new(0.3, -1.0, -0.7) , Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(-0.6, 0.3, 1.0)  , Vector::new(0.0, 0.0, 1.0) ),
+                (Point::new(0.4, 0.4, -1.0)  , Vector::new(0.0, 0.0, -1.0)),
+                (Point::new(1.0, 1.0, 1.0)   , Vector::new(1.0, 0.0, 0.0) ),
+                (Point::new(-1.0, -1.0, -1.0), Vector::new(-1.0, 0.0, 0.0)),
+            ];
+
+            for (point, normal) in &examples {
+                assert_eq!(c.local_normal_at(&point), *normal);
+            }
         }
     }
 }
