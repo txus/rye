@@ -61,7 +61,14 @@ impl World {
         );
         let reflected = self.reflected_color(&c, remaining);
         let refracted = self.refracted_color(&c, remaining);
-        surface + reflected + refracted
+
+        let material = c.object.material();
+        if material.reflective > 0.0 && material.transparency > 0.0 {
+            let reflectance = c.schlick();
+            surface + reflected * reflectance + refracted * (1.0 - reflectance)
+        } else {
+            surface + reflected + refracted
+        }
     }
 
     pub fn color_at(&self, r: &Ray, remaining: usize) -> Color {
@@ -111,7 +118,7 @@ impl World {
         let mut intersections = self.intersect(&r);
 
         match Intersection::hit(&mut intersections) {
-            Some(h) if h.t < distance => true,
+            Some(h) if h.t < distance && h.object.casts_shadows() => true,
             _ => false,
         }
     }
@@ -479,5 +486,37 @@ mod tests {
         let comps = i.precompute(&r, &is);
         let color = world.shade(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(0.93642, 0.68642, 0.68642));
+    }
+
+    #[test]
+    fn shade_with_reflective_transparent_material() {
+        let w = Rc::new(RefCell::new(World::default()));
+
+        update_world(&w, |world: &mut World| {
+            let mut floor = Plane::new();
+            floor.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
+            floor.material.reflective = 0.5;
+            floor.material.transparency = 0.5;
+            floor.material.refractive_index = 1.5;
+
+            let mut ball = Sphere::new();
+            ball.material.color = Color::new(1.0, 0.0, 0.0);
+            ball.material.ambient = 0.5;
+            ball.set_transform(Matrix4::translation(0.0, -3.5, -0.5));
+
+            world.objects.push(Box::from(ball));
+            world.objects.push(Box::from(floor));
+        });
+
+        let world = w.borrow();
+        let r = Ray::new(Point::new(0.0, 0.0, -3.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
+        let floor = world.objects.last().unwrap();
+        let is = vec![
+            Intersection { t: 2_f32.sqrt(), object: &**floor },
+        ];
+        let i = is[0];
+        let comps = i.precompute(&r, &is);
+        let color = world.shade(&comps, MAX_REFLECTIONS);
+        assert_eq!(color, Color::new(0.93391, 0.69643, 0.69243));
     }
 }

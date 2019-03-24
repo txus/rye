@@ -11,6 +11,7 @@ fn gen_id() -> i32 {
 
 pub trait Shape: Send + Sync {
     fn id(&self) -> i32;
+    fn casts_shadows(&self) -> bool;
     fn transform(&self) -> &Matrix4;
     fn inverse_transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
@@ -41,6 +42,7 @@ pub struct Sphere {
     pub id: i32,
     pub transform: Matrix4,
     pub material: Material,
+    pub casts_shadows: bool,
     pub inverse_transform: Matrix4,
 }
 
@@ -50,6 +52,7 @@ impl Sphere {
             id: gen_id(),
             material: Material::default(),
             transform: Matrix4::id(),
+            casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
         }
     }
@@ -63,6 +66,7 @@ impl Sphere {
                 ..Material::default()
             },
             transform: Matrix4::id(),
+            casts_shadows: true,
             inverse_transform: Matrix4::id().inverse()
         }
     }
@@ -71,6 +75,9 @@ impl Sphere {
 impl Shape for Sphere {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
     }
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
@@ -126,6 +133,7 @@ pub struct Plane {
     pub id: i32,
     pub transform: Matrix4,
     pub material: Material,
+    pub casts_shadows: bool,
     inverse_transform: Matrix4,
 }
 
@@ -135,6 +143,7 @@ impl Plane {
             id: gen_id(),
             transform: Matrix4::id(),
             material: Material::default(),
+            casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
         }
     }
@@ -143,6 +152,9 @@ impl Plane {
 impl Shape for Plane {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
     }
     fn set_transform(&mut self, t: Matrix4) {
         self.transform = t;
@@ -200,6 +212,9 @@ mod tests {
     impl Shape for TestShape {
         fn id(&self) -> i32 {
             0
+        }
+        fn casts_shadows(&self) -> bool {
+            true
         }
         fn set_material(&mut self, m: Material) {
             self.material = m;

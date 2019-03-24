@@ -46,6 +46,24 @@ pub struct Precomputation<'a> {
     pub inside: bool,
 }
 
+impl<'a> Precomputation<'a> {
+    pub fn schlick(&self) -> f32 {
+        let mut cos = self.eye.dot(&self.normal);
+        if self.n1 > self.n2 {
+            let n = self.n1 / self.n2;
+            let sin2_t = n.powf(2.0) * (1.0 - cos.powf(2.0));
+            if sin2_t > 1.0 {
+                return 1.0
+            }
+
+            let cos_t = (1.0 - sin2_t).sqrt();
+            cos = cos_t;
+        }
+        let r0 = ((self.n1 - self.n2) / (self.n1 + self.n2)).powf(2.0);
+        r0 + (1.0 - r0) * (1.0 - cos).powf(5.0)
+    }
+}
+
 impl<'a> Intersection<'a> {
     pub fn hit(xs: &'a [Intersection<'a>]) -> Option<Intersection> {
         let mut out: Vec<Intersection> = vec![];
@@ -290,5 +308,43 @@ mod tests {
         let comps = i.precompute(&r, &is);
         assert!(comps.under_point.z > EPSILON/2.0);
         assert!(comps.point.z < comps.under_point.z);
+    }
+
+    #[test]
+    fn schlick_approximation_under_total_internal_reflection() {
+        let shape = Sphere::glass();
+        let r = Ray::new(Point::new(0.0, 0.0, 2_f32.sqrt()/2.0), Vector::new(0.0, 1.0, 0.0));
+        let is = vec![
+            Intersection { t: -2_f32.sqrt()/2.0, object: &shape },
+            Intersection { t: 2_f32.sqrt()/2.0, object: &shape },
+        ];
+        let i = is[1];
+        let comps = i.precompute(&r, &is);
+        assert_eq!(comps.schlick(), 1.0);
+    }
+
+    #[test]
+    fn schlick_approximation_with_a_perpendicular_viewing_angle() {
+        let shape = Sphere::glass();
+        let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
+        let is = vec![
+            Intersection { t: -1.0, object: &shape },
+            Intersection { t: 1.0, object: &shape },
+        ];
+        let i = is[1];
+        let comps = i.precompute(&r, &is);
+        assert!((comps.schlick() - 0.04).abs() < EPSILON);
+    }
+
+    #[test]
+    fn schlick_approximation_with_small_angle_and_n2_greater_than_n1() {
+        let shape = Sphere::glass();
+        let r = Ray::new(Point::new(0.0, 0.99, -2.0), Vector::new(0.0, 0.0, 1.0));
+        let is = vec![
+            Intersection { t: 1.8589, object: &shape }
+        ];
+        let i = is[0];
+        let comps = i.precompute(&r, &is);
+        assert!((comps.schlick() - 0.48873).abs() < EPSILON);
     }
 }
