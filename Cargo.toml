@@ -1,5 +1,5 @@
 [package]
-name = "raytracer"
+name = "rye"
 version = "0.1.0"
 authors = ["Txus <me@txus.io>"]
 edition = "2018"
