@@ -279,6 +279,280 @@ impl Shape for Cube {
     }
 }
 
+pub struct Cylinder {
+    pub id: i32,
+    pub transform: Matrix4,
+    pub material: Material,
+    pub casts_shadows: bool,
+    pub minimum: f32,
+    pub maximum: f32,
+    pub closed: bool,
+    inverse_transform: Matrix4,
+}
+
+impl Cylinder {
+    pub fn new() -> Cylinder {
+        Cylinder {
+            id: gen_id(),
+            transform: Matrix4::id(),
+            material: Material::default(),
+            casts_shadows: true,
+            minimum: -INFINITY,
+            maximum: INFINITY,
+            closed: false,
+            inverse_transform: Matrix4::id().inverse(),
+        }
+    }
+
+    pub fn open(minimum: f32, maximum: f32) -> Cylinder {
+        let mut c = Cylinder::new();
+        c.minimum = minimum;
+        c.maximum = maximum;
+        c
+    }
+
+    pub fn closed(minimum: f32, maximum: f32) -> Cylinder {
+        let mut c = Cylinder::open(minimum, maximum);
+        c.closed = true;
+        c
+    }
+
+    fn check_cap(ray: &Ray, t: f32) -> bool {
+        let x = ray.origin.x + t * ray.direction.x;
+        let z = ray.origin.z + t * ray.direction.z;
+        (x.powf(2.0) + z.powf(2.0)) <= 1.0
+    }
+
+    fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
+        let mut is = vec![];
+        if !self.closed || ray.direction.y.abs() < EPSILON  {
+            return is;
+        }
+        let shape: &Shape = self;
+        let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
+        if Self::check_cap(ray, lower_t) {
+            is.push(Intersection { t: lower_t, object: shape })
+        }
+
+        let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
+        if Self::check_cap(ray, upper_t) {
+            is.push(Intersection { t: upper_t, object: shape })
+        }
+        is
+    }
+}
+
+impl Shape for Cylinder {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = m
+    }
+    fn material(&self) -> &Material {
+        &self.material
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point) -> Vector {
+        let dist = p.x.powf(2.0) + p.z.powf(2.0);
+        if dist < 1.0 && p.y >= self.maximum - EPSILON {
+            Vector::new(0.0, 1.0, 0.0)
+        } else if dist < 1.0 && p.y <= self.minimum + EPSILON {
+            Vector::new(0.0, -1.0, 0.0)
+        } else {
+            Vector::new(p.x, 0.0, p.z)
+        }
+    }
+    fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
+        let mut intersections = vec![];
+        let a = ray.direction.x.powf(2.0) + ray.direction.z.powf(2.0);
+        if a.abs() > EPSILON { // if the body of the cylinder intersects
+            let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
+            let c = ray.origin.x.powf(2.0) + ray.origin.z.powf(2.0) - 1.0;
+
+            let disc = b.powf(2.0) - 4.0 * a * c;
+
+            if disc >= 0.0 {
+                let t0_ = (-b - disc.sqrt()) / (2.0 * a);
+                let t1_ = (-b + disc.sqrt()) / (2.0 * a);
+                let mut t0 = t0_;
+                let mut t1 = t1_;
+                if t0_ > t1_ {
+                    t0 = t1_;
+                    t1 = t0_;
+                }
+                let shape: &Shape = self;
+                let y0 = ray.origin.y + t0 * ray.direction.y;
+                if self.minimum < y0 && y0 < self.maximum {
+                    intersections.push(Intersection { t: t0, object: shape });
+                }
+                let y1 = ray.origin.y + t1 * ray.direction.y;
+                if self.minimum < y1 && y1 < self.maximum {
+                    intersections.push(Intersection { t: t1, object: shape });
+                }
+            }
+        }
+        let mut cap_intersections = self.intersect_caps(ray);
+        intersections.append(&mut cap_intersections);
+        intersections
+    }
+}
+
+pub struct Cone {
+    pub id: i32,
+    pub transform: Matrix4,
+    pub material: Material,
+    pub casts_shadows: bool,
+    pub minimum: f32,
+    pub maximum: f32,
+    pub closed: bool,
+    inverse_transform: Matrix4,
+}
+
+impl Cone {
+    pub fn new() -> Cone {
+        Cone {
+            id: gen_id(),
+            transform: Matrix4::id(),
+            material: Material::default(),
+            casts_shadows: true,
+            minimum: -INFINITY,
+            maximum: INFINITY,
+            closed: false,
+            inverse_transform: Matrix4::id().inverse(),
+        }
+    }
+
+    pub fn open(minimum: f32, maximum: f32) -> Cone {
+        let mut c = Cone::new();
+        c.minimum = minimum;
+        c.maximum = maximum;
+        c
+    }
+
+    pub fn closed(minimum: f32, maximum: f32) -> Cone {
+        let mut c = Cone::open(minimum, maximum);
+        c.closed = true;
+        c
+    }
+
+    fn check_cap(ray: &Ray, radius: f32, t: f32) -> bool {
+        let x = ray.origin.x + t * ray.direction.x;
+        let z = ray.origin.z + t * ray.direction.z;
+        (x.powf(2.0) + z.powf(2.0)) <= radius
+    }
+
+    fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
+        let mut is = vec![];
+        if !self.closed || ray.direction.y.abs() < EPSILON  {
+            return is;
+        }
+        let shape: &Shape = self;
+        let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
+        if Self::check_cap(ray, lower_t, self.minimum) {
+            is.push(Intersection { t: lower_t, object: shape })
+        }
+
+        let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
+        if Self::check_cap(ray, upper_t, self.maximum) {
+            is.push(Intersection { t: upper_t, object: shape })
+        }
+        is
+    }
+}
+
+impl Shape for Cone {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = m
+    }
+    fn material(&self) -> &Material {
+        &self.material
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point) -> Vector {
+        let dist = p.x.powf(2.0) + p.z.powf(2.0);
+        if dist < 1.0 && p.y >= self.maximum - EPSILON {
+            Vector::new(0.0, 1.0, 0.0)
+        } else if dist < 1.0 && p.y <= self.minimum + EPSILON {
+            Vector::new(0.0, -1.0, 0.0)
+        } else {
+            Vector::new(p.x, 0.0, p.z)
+        }
+    }
+    fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
+        let shape: &Shape = self;
+        let mut intersections = vec![];
+        let a = ray.direction.x.powf(2.0) - ray.direction.y.powf(2.0) + ray.direction.z.powf(2.0);
+        let b = 2.0 * (ray.origin.x * ray.direction.x - ray.origin.y * ray.direction.y + ray.origin.z * ray.direction.z);
+        let c = ray.origin.x.powf(2.0) - ray.origin.y.powf(2.0) + ray.origin.z.powf(2.0);
+        if a.abs() > EPSILON { // if the body of the cone intersects
+            let disc = b.powf(2.0) - 4.0 * a * c;
+
+            if disc >= 0.0 {
+                let sq = disc.sqrt();
+                let t0 = (-b - sq) / (2.0 * a);
+                let t1 = (-b + sq) / (2.0 * a);
+
+                let y0 = ray.origin.y + t0 * ray.direction.y;
+                if self.minimum < y0 && y0 < self.maximum {
+                    intersections.push(Intersection { t: t0, object: shape });
+                }
+                let y1 = ray.origin.y + t1 * ray.direction.y;
+                if self.minimum < y1 && y1 < self.maximum {
+                    intersections.push(Intersection { t: t1, object: shape });
+                }
+            }
+        } else {
+            if b.abs() > EPSILON {
+                let t = -c / (2.0 * b);
+                let y = ray.origin.y + t * ray.direction.y;
+                if self.minimum < y && y < self.maximum {
+                    intersections.push(Intersection { t: (-c) / 2.0 * b, object: shape });
+                }
+            }
+        }
+        if self.closed {
+            let t0 = (self.minimum - ray.origin.y) / ray.direction.y;
+            if Self::check_cap(ray, self.minimum.abs(), t0) {
+                intersections.push(Intersection { t: t0, object: shape });
+            }
+
+            let t1 = (self.maximum - ray.origin.y) / ray.direction.y;
+            if Self::check_cap(ray, self.maximum.abs(), t1) {
+                intersections.push(Intersection { t: t1, object: shape });
+            }
+        }
+        intersections
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,6 +887,170 @@ mod tests {
 
             for (point, normal) in &examples {
                 assert_eq!(c.local_normal_at(&point), *normal);
+            }
+        }
+    }
+
+    mod cylinder {
+        use super::*;
+
+        #[test]
+        fn ray_strikes_cylinder() {
+            let c = Cylinder::new();
+            let examples = [
+                // origin, direction, t1, t2
+                (Point::new(1.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 5.0, 5.0),
+                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 4.0, 6.0),
+                (Point::new(0.5, 0.0, -5.0), Vector::new(0.1, 1.0, 1.0), 6.808006, 7.0886984)
+            ];
+
+            for (origin, direction, t1, t2) in &examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits, [*t1, *t2]);
+            }
+        }
+
+        #[test]
+        fn ray_misses_cylinder() {
+            let c = Cylinder::new();
+            let examples = [
+                (Point::new(1.0, 0.0, 0.0) , Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.0, 0.0, 0.0) , Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.0, 0.0, -5.0), Vector::new(1.0, 1.0, 1.0)),
+            ];
+
+            for (origin, direction) in &examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits, []);
+            }
+        }
+
+        #[test]
+        fn normal_vector() {
+            let c = Cylinder::new();
+            let examples = [
+                (Point::new(1.0, 0.0, 0.0) , Vector::new(1.0, 0.0, 0.0) ),
+                (Point::new(0.0, 5.0, -1.0), Vector::new(0.0, 0.0, -1.0)),
+                (Point::new(0.0, -2.0, 1.0), Vector::new(0.0, 0.0, 1.0) ),
+                (Point::new(-1.0, 1.0, 0.0), Vector::new(-1.0, 0.0, 0.0)),
+            ];
+
+            for (point, normal) in &examples {
+                assert_eq!(c.local_normal_at(&point), *normal);
+            }
+        }
+
+        #[test]
+        fn default_minimum_maximum() {
+            let c = Cylinder::new();
+            assert_eq!(c.minimum, -INFINITY);
+            assert_eq!(c.maximum, INFINITY);
+        }
+
+        #[test]
+        fn intersecting_constrained_cylinder() {
+            let c = Cylinder::open(1.0, 2.0);
+            let examples: &[(Point, Vector, usize)] = &[
+                // origin, direction, intersection count
+                (Point::new(0.0, 1.5, 0.0) , Vector::new(0.1, 1.0, 0.0), 0),
+                (Point::new(0.0, 3.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
+                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
+                (Point::new(0.0, 2.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
+                (Point::new(0.0, 1.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
+                (Point::new(0.0, 1.5, -2.0), Vector::new(0.0, 0.0, 1.0), 2),
+            ];
+
+            for (origin, direction, hit_count) in examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits.len(), *hit_count);
+            }
+        }
+
+        #[test]
+        fn intersecting_caps_of_closed_cylinder() {
+            let c = Cylinder::closed(1.0, 2.0);
+            let examples: &[(Point, Vector, usize)] = &[
+                // point, direction, intersection count
+                (Point::new(0.0, 3.0, 0.0)  , Vector::new(0.0, -1.0, 0.0) , 2),
+                (Point::new(0.0, 3.0, -2.0) , Vector::new(0.0, -1.0, 2.0) , 2),
+                (Point::new(0.0, 4.01, -2.0) , Vector::new(0.0, -1.0, 1.0) , 2), // edge case
+                (Point::new(0.0, 0.0, -2.0) , Vector::new(0.0, 1.0, 2.0)  , 2),
+                (Point::new(0.0, -1.01, -2.0), Vector::new(0.0, 1.0, 1.0)  , 2), // edge case
+            ];
+
+            for (origin, direction, hit_count) in examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits.len(), *hit_count);
+            }
+        }
+
+        #[test]
+        fn normal_vector_on_caps() {
+            let c = Cylinder::closed(1.0, 2.0);
+            let examples = [
+                // point, normal
+                (Point::new(0.0, 1.0, 0.0), Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(0.5, 1.0, 0.0), Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(0.0, 1.0, 0.5), Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(0.0, 2.0, 0.0), Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.5, 2.0, 0.0), Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.0, 2.0, 0.5), Vector::new(0.0, 1.0, 0.0)),
+            ];
+
+            for (point, direction) in &examples {
+                assert_eq!(c.local_normal_at(&point), *direction);
+            }
+        }
+    }
+
+    mod cone {
+        use super::*;
+
+        #[test]
+        fn ray_strikes_cone() {
+            let c = Cone::new();
+            let examples = [
+                // origin, direction, t1, t2
+                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 5.0, 5.0),
+                (Point::new(0.0, 0.0, -5.0), Vector::new(1.0, 1.0, 1.0), 8.66025, 8.66025),
+                (Point::new(1.0, 1.0, -5.0), Vector::new(-0.5, -1.0, 1.0), 4.55006, 49.44994),
+            ];
+
+            for (origin, direction, t1, t2) in &examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits, [*t1, *t2]);
+            }
+        }
+
+        #[test]
+        fn ray_strikes_cone_parallel_to_one_of_its_halves() {
+            let c = Cone::new();
+            let origin = Point::new(0.0, 0.0, -1.0);
+            let direction = Vector::new(0.0, 1.0, 1.0).normalize();
+            let r = Ray::new(origin, direction);
+            let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+            assert_eq!(hits, [0.35355]);
+        }
+
+        #[test]
+        fn intersecting_cone_end_caps() {
+            let c = Cone::closed(-0.5, 0.5);
+            let examples = [
+                // origin, direction, hit_count
+                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 1.0, 0.0), 0),
+                (Point::new(0.0, 0.0, -0.25), Vector::new(0.0, 1.0, 1.0), 2),
+                (Point::new(0.0, 0.0, -0.25), Vector::new(0.0, 1.0, 0.0), 4),
+            ];
+
+            for (origin, direction, hit_count) in &examples {
+                let r = Ray::new(*origin, direction.normalize());
+                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                assert_eq!(hits.len(), *hit_count);
             }
         }
     }
