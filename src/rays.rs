@@ -51,7 +51,7 @@ impl<'a> Precomputation<'a> {
         let mut cos = self.eye.dot(&self.normal);
         if self.n1 > self.n2 {
             let n = self.n1 / self.n2;
-            let sin2_t = n.powf(2.0) * (1.0 - cos.powf(2.0));
+            let sin2_t = n.powi(2) * (1.0 - cos.powi(2));
             if sin2_t > 1.0 {
                 return 1.0;
             }
@@ -59,7 +59,7 @@ impl<'a> Precomputation<'a> {
             let cos_t = (1.0 - sin2_t).sqrt();
             cos = cos_t;
         }
-        let r0 = ((self.n1 - self.n2) / (self.n1 + self.n2)).powf(2.0);
+        let r0 = ((self.n1 - self.n2) / (self.n1 + self.n2)).powi(2);
         r0 + (1.0 - r0) * (1.0 - cos).powf(5.0)
     }
 }

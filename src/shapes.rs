@@ -107,7 +107,7 @@ impl Shape for Sphere {
         let a = ray.direction.dot(&ray.direction);
         let b = ray.direction.dot(&sphere_to_ray) * 2.0;
         let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
-        let discriminant = b.powf(2.0) - 4.0 * a * c;
+        let discriminant = b.powi(2) - 4.0 * a * c;
 
         let s: &Shape = self;
 
@@ -326,7 +326,7 @@ impl Cylinder {
     fn check_cap(ray: &Ray, t: f32) -> bool {
         let x = ray.origin.x + t * ray.direction.x;
         let z = ray.origin.z + t * ray.direction.z;
-        (x.powf(2.0) + z.powf(2.0)) <= 1.0
+        (x.powi(2) + z.powi(2)) <= 1.0
     }
 
     fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
@@ -378,7 +378,7 @@ impl Shape for Cylinder {
         &self.inverse_transform
     }
     fn local_normal_at(&self, p: &Point) -> Vector {
-        let dist = p.x.powf(2.0) + p.z.powf(2.0);
+        let dist = p.x.powi(2) + p.z.powi(2);
         if dist < 1.0 && p.y >= self.maximum - EPSILON {
             Vector::new(0.0, 1.0, 0.0)
         } else if dist < 1.0 && p.y <= self.minimum + EPSILON {
@@ -389,13 +389,13 @@ impl Shape for Cylinder {
     }
     fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let mut intersections = vec![];
-        let a = ray.direction.x.powf(2.0) + ray.direction.z.powf(2.0);
+        let a = ray.direction.x.powi(2) + ray.direction.z.powi(2);
         if a.abs() > EPSILON {
             // if the body of the cylinder intersects
             let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
-            let c = ray.origin.x.powf(2.0) + ray.origin.z.powf(2.0) - 1.0;
+            let c = ray.origin.x.powi(2) + ray.origin.z.powi(2) - 1.0;
 
-            let disc = b.powf(2.0) - 4.0 * a * c;
+            let disc = b.powi(2) - 4.0 * a * c;
 
             if disc >= 0.0 {
                 let t0_ = (-b - disc.sqrt()) / (2.0 * a);
@@ -470,31 +470,7 @@ impl Cone {
     fn check_cap(ray: &Ray, radius: f32, t: f32) -> bool {
         let x = ray.origin.x + t * ray.direction.x;
         let z = ray.origin.z + t * ray.direction.z;
-        (x.powf(2.0) + z.powf(2.0)) <= radius
-    }
-
-    fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
-        let mut is = vec![];
-        if !self.closed || ray.direction.y.abs() < EPSILON {
-            return is;
-        }
-        let shape: &Shape = self;
-        let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
-        if Self::check_cap(ray, lower_t, self.minimum) {
-            is.push(Intersection {
-                t: lower_t,
-                object: shape,
-            })
-        }
-
-        let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
-        if Self::check_cap(ray, upper_t, self.maximum) {
-            is.push(Intersection {
-                t: upper_t,
-                object: shape,
-            })
-        }
-        is
+        (x.powi(2) + z.powi(2)) <= radius
     }
 }
 
@@ -522,7 +498,7 @@ impl Shape for Cone {
         &self.inverse_transform
     }
     fn local_normal_at(&self, p: &Point) -> Vector {
-        let dist = p.x.powf(2.0) + p.z.powf(2.0);
+        let dist = p.x.powi(2) + p.z.powi(2);
         if dist < 1.0 && p.y >= self.maximum - EPSILON {
             Vector::new(0.0, 1.0, 0.0)
         } else if dist < 1.0 && p.y <= self.minimum + EPSILON {
@@ -534,14 +510,14 @@ impl Shape for Cone {
     fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let shape: &Shape = self;
         let mut intersections = vec![];
-        let a = ray.direction.x.powf(2.0) - ray.direction.y.powf(2.0) + ray.direction.z.powf(2.0);
+        let a = ray.direction.x.powi(2) - ray.direction.y.powi(2) + ray.direction.z.powi(2);
         let b = 2.0
             * (ray.origin.x * ray.direction.x - ray.origin.y * ray.direction.y
                 + ray.origin.z * ray.direction.z);
-        let c = ray.origin.x.powf(2.0) - ray.origin.y.powf(2.0) + ray.origin.z.powf(2.0);
+        let c = ray.origin.x.powi(2) - ray.origin.y.powi(2) + ray.origin.z.powi(2);
         if a.abs() > EPSILON {
             // if the body of the cone intersects
-            let disc = b.powf(2.0) - 4.0 * a * c;
+            let disc = b.powi(2) - 4.0 * a * c;
 
             if disc >= 0.0 {
                 let sq = disc.sqrt();
@@ -575,7 +551,7 @@ impl Shape for Cone {
                 }
             }
         }
-        if self.closed {
+        if self.closed && ray.direction.y.abs() > EPSILON {
             let t0 = (self.minimum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.minimum.abs(), t0) {
                 intersections.push(Intersection {

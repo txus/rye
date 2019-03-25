@@ -135,8 +135,8 @@ impl Pattern for RingPattern {
     }
 
     fn color_at(&self, p: &Point) -> Color {
-        let px2 = p.x.powf(2.0);
-        let pz2 = p.z.powf(2.0);
+        let px2 = p.x.powi(2);
+        let pz2 = p.z.powi(2);
         if (px2 + pz2).sqrt().floor() % 2.0 == 0.0 {
             self.a
         } else {

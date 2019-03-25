@@ -393,7 +393,7 @@ impl Vector {
         Self { x, y, z }
     }
     pub fn magnitude(&self) -> f32 {
-        (self.x.powf(2.0) + self.y.powf(2.0) + self.z.powf(2.0)).sqrt()
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
     pub fn normalize(&self) -> Self {
         let m = self.magnitude();

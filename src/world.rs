@@ -97,7 +97,7 @@ impl World {
         } else {
             let n_ratio = comps.n1 / comps.n2;
             let cos_i = comps.eye.dot(&comps.normal);
-            let sin2_t = n_ratio.powf(2.0) * (1.0 - cos_i.powf(2.0));
+            let sin2_t = n_ratio.powi(2) * (1.0 - cos_i.powi(2));
             if sin2_t > 1.0 {
                 Color::black()
             } else {
