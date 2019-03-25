@@ -504,21 +504,26 @@ impl Shape for Cone {
         } else if dist < 1.0 && p.y <= self.minimum + EPSILON {
             Vector::new(0.0, -1.0, 0.0)
         } else {
-            Vector::new(p.x, 0.0, p.z)
+            let mut y = (p.x.powi(2) + p.z.powi(2)).sqrt();
+            if p.y > 0.0 {
+                y = -y;
+            }
+            Vector::new(p.x, y, p.z)
         }
     }
     fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
+        let o = ray.origin;
+        let d = ray.direction;
         let shape: &Shape = self;
         let mut intersections = vec![];
-        let a = ray.direction.x.powi(2) - ray.direction.y.powi(2) + ray.direction.z.powi(2);
-        let b = 2.0
-            * (ray.origin.x * ray.direction.x - ray.origin.y * ray.direction.y
-                + ray.origin.z * ray.direction.z);
-        let c = ray.origin.x.powi(2) - ray.origin.y.powi(2) + ray.origin.z.powi(2);
+        let a = d.x.powi(2) - d.y.powi(2) + d.z.powi(2);
+        let b = 2.0 * o.x * d.x - 2.0 * o.y * d.y + 2.0 * o.z * d.z;
+        let c = o.x.powi(2) - o.y.powi(2) + o.z.powi(2);
         if a.abs() > EPSILON {
             // if the body of the cone intersects
             let disc = b.powi(2) - 4.0 * a * c;
 
+            println!("disc {:?}", disc);
             if disc >= 0.0 {
                 let sq = disc.sqrt();
                 let t0 = (-b - sq) / (2.0 * a);
@@ -540,17 +545,18 @@ impl Shape for Cone {
                 }
             }
         } else {
-            if b.abs() > EPSILON {
+            if b.abs() > EPSILON { // is the ray parallel to one of the cone halves?
                 let t = -c / (2.0 * b);
                 let y = ray.origin.y + t * ray.direction.y;
                 if self.minimum < y && y < self.maximum {
                     intersections.push(Intersection {
-                        t: (-c) / 2.0 * b,
+                        t: t,
                         object: shape,
                     });
                 }
             }
         }
+        // intersect with the caps
         if self.closed && ray.direction.y.abs() > EPSILON {
             let t0 = (self.minimum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.minimum.abs(), t0) {
@@ -1124,16 +1130,16 @@ mod tests {
                     5.0,
                 ),
                 (
-                    Point::new(0.0, 0.0, -5.0),
+                    Point::new(0.0, 0.0, -5.00001),
                     Vector::new(1.0, 1.0, 1.0),
-                    8.66025,
-                    8.66025,
+                    8.660272,
+                    8.660272,
                 ),
                 (
                     Point::new(1.0, 1.0, -5.0),
                     Vector::new(-0.5, -1.0, 1.0),
-                    4.55006,
-                    49.44994,
+                    4.5500546,
+                    49.449955,
                 ),
             ];
 
@@ -1159,7 +1165,7 @@ mod tests {
                 .iter()
                 .map(|x| x.t)
                 .collect::<Vec<f32>>();
-            assert_eq!(hits, [0.35355]);
+            assert_eq!(hits, [0.35355338]);
         }
 
         #[test]
@@ -1180,6 +1186,21 @@ mod tests {
                     .map(|x| x.t)
                     .collect::<Vec<f32>>();
                 assert_eq!(hits.len(), *hit_count);
+            }
+        }
+
+        #[test]
+        fn computing_normal_vector_on_cone() {
+            let c = Cone::new();
+            let examples = [
+                // point, normal
+                (Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 0.0, 0.0)),
+                (Point::new(1.0, 1.0, 1.0), Vector::new(1.0, -(2_f32.sqrt()), 1.0)),
+                (Point::new(-1.0, -1.0, 0.0), Vector::new(-1.0, 1.0, 0.0)),
+            ];
+
+            for (point, direction) in &examples {
+                assert_eq!(c.local_normal_at(&point), *direction);
             }
         }
     }
