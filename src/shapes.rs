@@ -69,7 +69,7 @@ impl Sphere {
             },
             transform: Matrix4::id(),
             casts_shadows: true,
-            inverse_transform: Matrix4::id().inverse()
+            inverse_transform: Matrix4::id().inverse(),
         }
     }
 }
@@ -272,8 +272,14 @@ impl Shape for Cube {
         } else {
             let shape: &Shape = self;
             vec![
-                Intersection { t: tmin, object: shape },
-                Intersection { t: tmax, object: shape }
+                Intersection {
+                    t: tmin,
+                    object: shape,
+                },
+                Intersection {
+                    t: tmax,
+                    object: shape,
+                },
             ]
         }
     }
@@ -325,18 +331,24 @@ impl Cylinder {
 
     fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
         let mut is = vec![];
-        if !self.closed || ray.direction.y.abs() < EPSILON  {
+        if !self.closed || ray.direction.y.abs() < EPSILON {
             return is;
         }
         let shape: &Shape = self;
         let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, lower_t) {
-            is.push(Intersection { t: lower_t, object: shape })
+            is.push(Intersection {
+                t: lower_t,
+                object: shape,
+            })
         }
 
         let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, upper_t) {
-            is.push(Intersection { t: upper_t, object: shape })
+            is.push(Intersection {
+                t: upper_t,
+                object: shape,
+            })
         }
         is
     }
@@ -378,7 +390,8 @@ impl Shape for Cylinder {
     fn local_intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let mut intersections = vec![];
         let a = ray.direction.x.powf(2.0) + ray.direction.z.powf(2.0);
-        if a.abs() > EPSILON { // if the body of the cylinder intersects
+        if a.abs() > EPSILON {
+            // if the body of the cylinder intersects
             let b = 2.0 * ray.origin.x * ray.direction.x + 2.0 * ray.origin.z * ray.direction.z;
             let c = ray.origin.x.powf(2.0) + ray.origin.z.powf(2.0) - 1.0;
 
@@ -396,11 +409,17 @@ impl Shape for Cylinder {
                 let shape: &Shape = self;
                 let y0 = ray.origin.y + t0 * ray.direction.y;
                 if self.minimum < y0 && y0 < self.maximum {
-                    intersections.push(Intersection { t: t0, object: shape });
+                    intersections.push(Intersection {
+                        t: t0,
+                        object: shape,
+                    });
                 }
                 let y1 = ray.origin.y + t1 * ray.direction.y;
                 if self.minimum < y1 && y1 < self.maximum {
-                    intersections.push(Intersection { t: t1, object: shape });
+                    intersections.push(Intersection {
+                        t: t1,
+                        object: shape,
+                    });
                 }
             }
         }
@@ -456,18 +475,24 @@ impl Cone {
 
     fn intersect_caps<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
         let mut is = vec![];
-        if !self.closed || ray.direction.y.abs() < EPSILON  {
+        if !self.closed || ray.direction.y.abs() < EPSILON {
             return is;
         }
         let shape: &Shape = self;
         let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, lower_t, self.minimum) {
-            is.push(Intersection { t: lower_t, object: shape })
+            is.push(Intersection {
+                t: lower_t,
+                object: shape,
+            })
         }
 
         let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, upper_t, self.maximum) {
-            is.push(Intersection { t: upper_t, object: shape })
+            is.push(Intersection {
+                t: upper_t,
+                object: shape,
+            })
         }
         is
     }
@@ -510,9 +535,12 @@ impl Shape for Cone {
         let shape: &Shape = self;
         let mut intersections = vec![];
         let a = ray.direction.x.powf(2.0) - ray.direction.y.powf(2.0) + ray.direction.z.powf(2.0);
-        let b = 2.0 * (ray.origin.x * ray.direction.x - ray.origin.y * ray.direction.y + ray.origin.z * ray.direction.z);
+        let b = 2.0
+            * (ray.origin.x * ray.direction.x - ray.origin.y * ray.direction.y
+                + ray.origin.z * ray.direction.z);
         let c = ray.origin.x.powf(2.0) - ray.origin.y.powf(2.0) + ray.origin.z.powf(2.0);
-        if a.abs() > EPSILON { // if the body of the cone intersects
+        if a.abs() > EPSILON {
+            // if the body of the cone intersects
             let disc = b.powf(2.0) - 4.0 * a * c;
 
             if disc >= 0.0 {
@@ -522,11 +550,17 @@ impl Shape for Cone {
 
                 let y0 = ray.origin.y + t0 * ray.direction.y;
                 if self.minimum < y0 && y0 < self.maximum {
-                    intersections.push(Intersection { t: t0, object: shape });
+                    intersections.push(Intersection {
+                        t: t0,
+                        object: shape,
+                    });
                 }
                 let y1 = ray.origin.y + t1 * ray.direction.y;
                 if self.minimum < y1 && y1 < self.maximum {
-                    intersections.push(Intersection { t: t1, object: shape });
+                    intersections.push(Intersection {
+                        t: t1,
+                        object: shape,
+                    });
                 }
             }
         } else {
@@ -534,19 +568,28 @@ impl Shape for Cone {
                 let t = -c / (2.0 * b);
                 let y = ray.origin.y + t * ray.direction.y;
                 if self.minimum < y && y < self.maximum {
-                    intersections.push(Intersection { t: (-c) / 2.0 * b, object: shape });
+                    intersections.push(Intersection {
+                        t: (-c) / 2.0 * b,
+                        object: shape,
+                    });
                 }
             }
         }
         if self.closed {
             let t0 = (self.minimum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.minimum.abs(), t0) {
-                intersections.push(Intersection { t: t0, object: shape });
+                intersections.push(Intersection {
+                    t: t0,
+                    object: shape,
+                });
             }
 
             let t1 = (self.maximum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.maximum.abs(), t1) {
-                intersections.push(Intersection { t: t1, object: shape });
+                intersections.push(Intersection {
+                    t: t1,
+                    object: shape,
+                });
             }
         }
         intersections
@@ -836,18 +879,57 @@ mod tests {
             let c = Cube::new();
             let examples = [
                 // origin, direction, t1, t2
-                (Point::new(5.0, 0.5, 0.0), Vector::new(-1.0, 0.0, 0.0), 4.0, 6.0),
-                (Point::new(-5.0, 0.5, 0.0), Vector::new(1.0, 0.0, 0.0), 4.0, 6.0),
-                (Point::new(0.5, 5.0, 0.0), Vector::new(0.0, -1.0, 0.0), 4.0, 6.0),
-                (Point::new(0.5, -5.0, 0.0), Vector::new(0.0, 1.0, 0.0), 4.0, 6.0),
-                (Point::new(0.5, 0.0, 5.0), Vector::new(0.0, 0.0, -1.0), 4.0, 6.0),
-                (Point::new(0.5, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 4.0, 6.0),
-                (Point::new(0.0, 0.5, 0.0), Vector::new(0.0, 0.0, 1.0), -1.0, 1.0),
+                (
+                    Point::new(5.0, 0.5, 0.0),
+                    Vector::new(-1.0, 0.0, 0.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(-5.0, 0.5, 0.0),
+                    Vector::new(1.0, 0.0, 0.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.5, 5.0, 0.0),
+                    Vector::new(0.0, -1.0, 0.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.5, -5.0, 0.0),
+                    Vector::new(0.0, 1.0, 0.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.5, 0.0, 5.0),
+                    Vector::new(0.0, 0.0, -1.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.5, 0.0, -5.0),
+                    Vector::new(0.0, 0.0, 1.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.0, 0.5, 0.0),
+                    Vector::new(0.0, 0.0, 1.0),
+                    -1.0,
+                    1.0,
+                ),
             ];
 
             for (origin, direction, t1, t2) in &examples {
                 let r = Ray::new(*origin, *direction);
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits, [*t1, *t2]);
             }
         }
@@ -856,17 +938,30 @@ mod tests {
         fn ray_misses_cube() {
             let c = Cube::new();
             let examples = [
-                (Point::new(-2.0, 0.0, 0.0), Vector::new(0.2673, 0.5345, 0.8018)),
-                (Point::new(0.0, -2.0, 0.0), Vector::new(0.8018, 0.2673, 0.5345)),
-                (Point::new(0.0, 0.0, -2.0), Vector::new(0.5345, 0.8018, 0.2673)),
+                (
+                    Point::new(-2.0, 0.0, 0.0),
+                    Vector::new(0.2673, 0.5345, 0.8018),
+                ),
+                (
+                    Point::new(0.0, -2.0, 0.0),
+                    Vector::new(0.8018, 0.2673, 0.5345),
+                ),
+                (
+                    Point::new(0.0, 0.0, -2.0),
+                    Vector::new(0.5345, 0.8018, 0.2673),
+                ),
                 (Point::new(2.0, 0.0, 2.0), Vector::new(0.0, 0.0, -1.0)),
                 (Point::new(0.0, 2.0, 2.0), Vector::new(0.0, -1.0, 0.0)),
-                (Point::new(2.0, 2.0, 0.0), Vector::new(-1.0, 0.0, 0.0))
+                (Point::new(2.0, 2.0, 0.0), Vector::new(-1.0, 0.0, 0.0)),
             ];
 
             for (origin, direction) in &examples {
                 let r = Ray::new(*origin, *direction);
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits, []);
             }
         }
@@ -875,13 +970,13 @@ mod tests {
         fn normal_on_surface() {
             let c = Cube::new();
             let examples = [
-                (Point::new(1.0, 0.5, -0.8)  , Vector::new(1.0, 0.0, 0.0) ),
-                (Point::new(-1.0, -0.2, 0.9) , Vector::new(-1.0, 0.0, 0.0)),
-                (Point::new(-0.4, 1.0, -0.1) , Vector::new(0.0, 1.0, 0.0) ),
-                (Point::new(0.3, -1.0, -0.7) , Vector::new(0.0, -1.0, 0.0)),
-                (Point::new(-0.6, 0.3, 1.0)  , Vector::new(0.0, 0.0, 1.0) ),
-                (Point::new(0.4, 0.4, -1.0)  , Vector::new(0.0, 0.0, -1.0)),
-                (Point::new(1.0, 1.0, 1.0)   , Vector::new(1.0, 0.0, 0.0) ),
+                (Point::new(1.0, 0.5, -0.8), Vector::new(1.0, 0.0, 0.0)),
+                (Point::new(-1.0, -0.2, 0.9), Vector::new(-1.0, 0.0, 0.0)),
+                (Point::new(-0.4, 1.0, -0.1), Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.3, -1.0, -0.7), Vector::new(0.0, -1.0, 0.0)),
+                (Point::new(-0.6, 0.3, 1.0), Vector::new(0.0, 0.0, 1.0)),
+                (Point::new(0.4, 0.4, -1.0), Vector::new(0.0, 0.0, -1.0)),
+                (Point::new(1.0, 1.0, 1.0), Vector::new(1.0, 0.0, 0.0)),
                 (Point::new(-1.0, -1.0, -1.0), Vector::new(-1.0, 0.0, 0.0)),
             ];
 
@@ -899,14 +994,33 @@ mod tests {
             let c = Cylinder::new();
             let examples = [
                 // origin, direction, t1, t2
-                (Point::new(1.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 5.0, 5.0),
-                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 4.0, 6.0),
-                (Point::new(0.5, 0.0, -5.0), Vector::new(0.1, 1.0, 1.0), 6.808006, 7.0886984)
+                (
+                    Point::new(1.0, 0.0, -5.0),
+                    Vector::new(0.0, 0.0, 1.0),
+                    5.0,
+                    5.0,
+                ),
+                (
+                    Point::new(0.0, 0.0, -5.0),
+                    Vector::new(0.0, 0.0, 1.0),
+                    4.0,
+                    6.0,
+                ),
+                (
+                    Point::new(0.5, 0.0, -5.0),
+                    Vector::new(0.1, 1.0, 1.0),
+                    6.808006,
+                    7.0886984,
+                ),
             ];
 
             for (origin, direction, t1, t2) in &examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits, [*t1, *t2]);
             }
         }
@@ -915,14 +1029,18 @@ mod tests {
         fn ray_misses_cylinder() {
             let c = Cylinder::new();
             let examples = [
-                (Point::new(1.0, 0.0, 0.0) , Vector::new(0.0, 1.0, 0.0)),
-                (Point::new(0.0, 0.0, 0.0) , Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(1.0, 0.0, 0.0), Vector::new(0.0, 1.0, 0.0)),
+                (Point::new(0.0, 0.0, 0.0), Vector::new(0.0, 1.0, 0.0)),
                 (Point::new(0.0, 0.0, -5.0), Vector::new(1.0, 1.0, 1.0)),
             ];
 
             for (origin, direction) in &examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits, []);
             }
         }
@@ -931,9 +1049,9 @@ mod tests {
         fn normal_vector() {
             let c = Cylinder::new();
             let examples = [
-                (Point::new(1.0, 0.0, 0.0) , Vector::new(1.0, 0.0, 0.0) ),
+                (Point::new(1.0, 0.0, 0.0), Vector::new(1.0, 0.0, 0.0)),
                 (Point::new(0.0, 5.0, -1.0), Vector::new(0.0, 0.0, -1.0)),
-                (Point::new(0.0, -2.0, 1.0), Vector::new(0.0, 0.0, 1.0) ),
+                (Point::new(0.0, -2.0, 1.0), Vector::new(0.0, 0.0, 1.0)),
                 (Point::new(-1.0, 1.0, 0.0), Vector::new(-1.0, 0.0, 0.0)),
             ];
 
@@ -954,7 +1072,7 @@ mod tests {
             let c = Cylinder::open(1.0, 2.0);
             let examples: &[(Point, Vector, usize)] = &[
                 // origin, direction, intersection count
-                (Point::new(0.0, 1.5, 0.0) , Vector::new(0.1, 1.0, 0.0), 0),
+                (Point::new(0.0, 1.5, 0.0), Vector::new(0.1, 1.0, 0.0), 0),
                 (Point::new(0.0, 3.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
                 (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
                 (Point::new(0.0, 2.0, -5.0), Vector::new(0.0, 0.0, 1.0), 0),
@@ -964,7 +1082,11 @@ mod tests {
 
             for (origin, direction, hit_count) in examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits.len(), *hit_count);
             }
         }
@@ -974,16 +1096,20 @@ mod tests {
             let c = Cylinder::closed(1.0, 2.0);
             let examples: &[(Point, Vector, usize)] = &[
                 // point, direction, intersection count
-                (Point::new(0.0, 3.0, 0.0)  , Vector::new(0.0, -1.0, 0.0) , 2),
-                (Point::new(0.0, 3.0, -2.0) , Vector::new(0.0, -1.0, 2.0) , 2),
-                (Point::new(0.0, 4.01, -2.0) , Vector::new(0.0, -1.0, 1.0) , 2), // edge case
-                (Point::new(0.0, 0.0, -2.0) , Vector::new(0.0, 1.0, 2.0)  , 2),
-                (Point::new(0.0, -1.01, -2.0), Vector::new(0.0, 1.0, 1.0)  , 2), // edge case
+                (Point::new(0.0, 3.0, 0.0), Vector::new(0.0, -1.0, 0.0), 2),
+                (Point::new(0.0, 3.0, -2.0), Vector::new(0.0, -1.0, 2.0), 2),
+                (Point::new(0.0, 4.01, -2.0), Vector::new(0.0, -1.0, 1.0), 2), // edge case
+                (Point::new(0.0, 0.0, -2.0), Vector::new(0.0, 1.0, 2.0), 2),
+                (Point::new(0.0, -1.01, -2.0), Vector::new(0.0, 1.0, 1.0), 2), // edge case
             ];
 
             for (origin, direction, hit_count) in examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits.len(), *hit_count);
             }
         }
@@ -1015,14 +1141,33 @@ mod tests {
             let c = Cone::new();
             let examples = [
                 // origin, direction, t1, t2
-                (Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0), 5.0, 5.0),
-                (Point::new(0.0, 0.0, -5.0), Vector::new(1.0, 1.0, 1.0), 8.66025, 8.66025),
-                (Point::new(1.0, 1.0, -5.0), Vector::new(-0.5, -1.0, 1.0), 4.55006, 49.44994),
+                (
+                    Point::new(0.0, 0.0, -5.0),
+                    Vector::new(0.0, 0.0, 1.0),
+                    5.0,
+                    5.0,
+                ),
+                (
+                    Point::new(0.0, 0.0, -5.0),
+                    Vector::new(1.0, 1.0, 1.0),
+                    8.66025,
+                    8.66025,
+                ),
+                (
+                    Point::new(1.0, 1.0, -5.0),
+                    Vector::new(-0.5, -1.0, 1.0),
+                    4.55006,
+                    49.44994,
+                ),
             ];
 
             for (origin, direction, t1, t2) in &examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits, [*t1, *t2]);
             }
         }
@@ -1033,7 +1178,11 @@ mod tests {
             let origin = Point::new(0.0, 0.0, -1.0);
             let direction = Vector::new(0.0, 1.0, 1.0).normalize();
             let r = Ray::new(origin, direction);
-            let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+            let hits = c
+                .local_intersect(&r)
+                .iter()
+                .map(|x| x.t)
+                .collect::<Vec<f32>>();
             assert_eq!(hits, [0.35355]);
         }
 
@@ -1049,7 +1198,11 @@ mod tests {
 
             for (origin, direction, hit_count) in &examples {
                 let r = Ray::new(*origin, direction.normalize());
-                let hits = c.local_intersect(&r).iter().map(|x| x.t).collect::<Vec<f32>>();
+                let hits = c
+                    .local_intersect(&r)
+                    .iter()
+                    .map(|x| x.t)
+                    .collect::<Vec<f32>>();
                 assert_eq!(hits.len(), *hit_count);
             }
         }

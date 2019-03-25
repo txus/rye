@@ -101,10 +101,11 @@ impl World {
             if sin2_t > 1.0 {
                 Color::black()
             } else {
-              let cos_t = (1.0 - sin2_t).sqrt();
-              let direction = (comps.normal * ((n_ratio * cos_i) - cos_t)) - (comps.eye * n_ratio);
-              let refract_ray = Ray::new(comps.under_point, direction);
-              self.color_at(&refract_ray, remaining - 1) * comps.object.material().transparency
+                let cos_t = (1.0 - sin2_t).sqrt();
+                let direction =
+                    (comps.normal * ((n_ratio * cos_i) - cos_t)) - (comps.eye * n_ratio);
+                let refract_ray = Ray::new(comps.under_point, direction);
+                self.color_at(&refract_ray, remaining - 1) * comps.object.material().transparency
             }
         }
     }
@@ -255,9 +256,9 @@ mod tests {
         assert!(comps.point.z > comps.over_point.z);
     }
 
-    use std::rc::Rc;
-    use std::cell::RefCell;
     use crate::patterns::TestPattern;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     fn update_world(w: &Rc<RefCell<World>>, f: fn(&mut World) -> ()) {
         f(&mut w.borrow_mut());
@@ -279,7 +280,10 @@ mod tests {
 
         let world = w.borrow();
         let s = world.objects.last().unwrap();
-        i = Intersection { t: 1.0, object: &**s };
+        i = Intersection {
+            t: 1.0,
+            object: &**s,
+        };
         let is = [i];
         let comps = i.precompute(&r, &is);
         let color = world.reflected_color(&comps, 1);
@@ -304,8 +308,14 @@ mod tests {
 
         let world = w.borrow();
         let plane = world.objects.last().unwrap();
-        let r = Ray::new(Point::new(0.0, 0.0, -3.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
-        let i = Intersection { t: 2_f32.sqrt(), object: &**plane };
+        let r = Ray::new(
+            Point::new(0.0, 0.0, -3.0),
+            Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
+        );
+        let i = Intersection {
+            t: 2_f32.sqrt(),
+            object: &**plane,
+        };
         let is = [i];
         let comps = i.precompute(&r, &is);
         let color = world.reflected_color(&comps, 1);
@@ -325,8 +335,14 @@ mod tests {
 
         let world = w.borrow();
         let plane = world.objects.last().unwrap();
-        let r = Ray::new(Point::new(0.0, 0.0, -3.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
-        let i = Intersection { t: 2_f32.sqrt(), object: &**plane };
+        let r = Ray::new(
+            Point::new(0.0, 0.0, -3.0),
+            Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
+        );
+        let i = Intersection {
+            t: 2_f32.sqrt(),
+            object: &**plane,
+        };
         let is = [i];
         let comps = i.precompute(&r, &is);
         let color = world.shade(&comps, 1);
@@ -361,8 +377,14 @@ mod tests {
         let shape = world.objects.first().unwrap();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
-            Intersection { t: 4.0, object: &**shape },
-            Intersection { t: 6.0, object: &**shape }
+            Intersection {
+                t: 4.0,
+                object: &**shape,
+            },
+            Intersection {
+                t: 6.0,
+                object: &**shape,
+            },
         ];
         let i = is[0];
         let comps = i.precompute(&r, &is);
@@ -387,8 +409,14 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let shape = world.objects.first().unwrap();
         let is = vec![
-            Intersection { t: 4.0, object: &**shape },
-            Intersection { t: 6.0, object: &**shape }
+            Intersection {
+                t: 4.0,
+                object: &**shape,
+            },
+            Intersection {
+                t: 6.0,
+                object: &**shape,
+            },
         ];
         let i = is[0];
         let comps = i.precompute(&r, &is);
@@ -410,11 +438,20 @@ mod tests {
         });
 
         let world = w.borrow();
-        let r = Ray::new(Point::new(0.0, 0.0, 2_f32.sqrt()), Vector::new(0.0, 1.0, 0.0));
+        let r = Ray::new(
+            Point::new(0.0, 0.0, 2_f32.sqrt()),
+            Vector::new(0.0, 1.0, 0.0),
+        );
         let shape = world.objects.first().unwrap();
         let is = vec![
-            Intersection { t: -2_f32.sqrt(), object: &**shape },
-            Intersection { t: 2_f32.sqrt(), object: &**shape }
+            Intersection {
+                t: -2_f32.sqrt(),
+                object: &**shape,
+            },
+            Intersection {
+                t: 2_f32.sqrt(),
+                object: &**shape,
+            },
         ];
         let i = is[1];
         let comps = i.precompute(&r, &is);
@@ -446,10 +483,22 @@ mod tests {
         let a = world.objects.first().unwrap();
         let b = world.objects.last().unwrap();
         let is = vec![
-            Intersection { t: -0.9899, object: &**a },
-            Intersection { t: -0.4899, object: &**b },
-            Intersection { t: 0.4899, object: &**b },
-            Intersection { t: 0.9899, object: &**a }
+            Intersection {
+                t: -0.9899,
+                object: &**a,
+            },
+            Intersection {
+                t: -0.4899,
+                object: &**b,
+            },
+            Intersection {
+                t: 0.4899,
+                object: &**b,
+            },
+            Intersection {
+                t: 0.9899,
+                object: &**a,
+            },
         ];
         let i = is[2];
         let comps = i.precompute(&r, &is);
@@ -477,11 +526,15 @@ mod tests {
         });
 
         let world = w.borrow();
-        let r = Ray::new(Point::new(0.0, 0.0, -3.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
+        let r = Ray::new(
+            Point::new(0.0, 0.0, -3.0),
+            Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
+        );
         let floor = world.objects.last().unwrap();
-        let is = vec![
-            Intersection { t: 2_f32.sqrt(), object: &**floor },
-        ];
+        let is = vec![Intersection {
+            t: 2_f32.sqrt(),
+            object: &**floor,
+        }];
         let i = is[0];
         let comps = i.precompute(&r, &is);
         let color = world.shade(&comps, MAX_REFLECTIONS);
@@ -509,11 +562,15 @@ mod tests {
         });
 
         let world = w.borrow();
-        let r = Ray::new(Point::new(0.0, 0.0, -3.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
+        let r = Ray::new(
+            Point::new(0.0, 0.0, -3.0),
+            Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
+        );
         let floor = world.objects.last().unwrap();
-        let is = vec![
-            Intersection { t: 2_f32.sqrt(), object: &**floor },
-        ];
+        let is = vec![Intersection {
+            t: 2_f32.sqrt(),
+            object: &**floor,
+        }];
         let i = is[0];
         let comps = i.precompute(&r, &is);
         let color = world.shade(&comps, MAX_REFLECTIONS);

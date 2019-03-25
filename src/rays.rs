@@ -53,7 +53,7 @@ impl<'a> Precomputation<'a> {
             let n = self.n1 / self.n2;
             let sin2_t = n.powf(2.0) * (1.0 - cos.powf(2.0));
             if sin2_t > 1.0 {
-                return 1.0
+                return 1.0;
             }
 
             let cos_t = (1.0 - sin2_t).sqrt();
@@ -131,7 +131,7 @@ impl<'a> Intersection<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::{Sphere, Plane};
+    use crate::shapes::{Plane, Sphere};
 
     #[test]
     fn initialize() {
@@ -229,11 +229,20 @@ mod tests {
     #[test]
     fn precomputing_reflect_vector() {
         let s = Plane::new();
-        let r = Ray::new(Point::new(0.0, 1.0, -1.0), Vector::new(0.0, -2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
-        let i = Intersection { t: 2_f32.sqrt(), object: &s };
+        let r = Ray::new(
+            Point::new(0.0, 1.0, -1.0),
+            Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
+        );
+        let i = Intersection {
+            t: 2_f32.sqrt(),
+            object: &s,
+        };
         let mut is = [i];
         let c = i.precompute(&r, &mut is);
-        assert_eq!(c.reflect, Vector::new(0.0, 2_f32.sqrt()/2.0, 2_f32.sqrt()/2.0));
+        assert_eq!(
+            c.reflect,
+            Vector::new(0.0, 2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0)
+        );
     }
 
     #[test]
@@ -271,10 +280,22 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -4.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
             Intersection { t: 2.0, object: &a },
-            Intersection { t: 2.75, object: &b },
-            Intersection { t: 3.25, object: &c },
-            Intersection { t: 4.75, object: &b },
-            Intersection { t: 5.25, object: &c },
+            Intersection {
+                t: 2.75,
+                object: &b,
+            },
+            Intersection {
+                t: 3.25,
+                object: &c,
+            },
+            Intersection {
+                t: 4.75,
+                object: &b,
+            },
+            Intersection {
+                t: 5.25,
+                object: &c,
+            },
             Intersection { t: 6.0, object: &a },
         ];
 
@@ -302,21 +323,31 @@ mod tests {
         let mut shape = Sphere::glass();
         shape.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
         let i = Intersection {
-            t: 5.0, object: &shape
+            t: 5.0,
+            object: &shape,
         };
         let is = [i];
         let comps = i.precompute(&r, &is);
-        assert!(comps.under_point.z > EPSILON/2.0);
+        assert!(comps.under_point.z > EPSILON / 2.0);
         assert!(comps.point.z < comps.under_point.z);
     }
 
     #[test]
     fn schlick_approximation_under_total_internal_reflection() {
         let shape = Sphere::glass();
-        let r = Ray::new(Point::new(0.0, 0.0, 2_f32.sqrt()/2.0), Vector::new(0.0, 1.0, 0.0));
+        let r = Ray::new(
+            Point::new(0.0, 0.0, 2_f32.sqrt() / 2.0),
+            Vector::new(0.0, 1.0, 0.0),
+        );
         let is = vec![
-            Intersection { t: -2_f32.sqrt()/2.0, object: &shape },
-            Intersection { t: 2_f32.sqrt()/2.0, object: &shape },
+            Intersection {
+                t: -2_f32.sqrt() / 2.0,
+                object: &shape,
+            },
+            Intersection {
+                t: 2_f32.sqrt() / 2.0,
+                object: &shape,
+            },
         ];
         let i = is[1];
         let comps = i.precompute(&r, &is);
@@ -328,8 +359,14 @@ mod tests {
         let shape = Sphere::glass();
         let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
         let is = vec![
-            Intersection { t: -1.0, object: &shape },
-            Intersection { t: 1.0, object: &shape },
+            Intersection {
+                t: -1.0,
+                object: &shape,
+            },
+            Intersection {
+                t: 1.0,
+                object: &shape,
+            },
         ];
         let i = is[1];
         let comps = i.precompute(&r, &is);
@@ -340,9 +377,10 @@ mod tests {
     fn schlick_approximation_with_small_angle_and_n2_greater_than_n1() {
         let shape = Sphere::glass();
         let r = Ray::new(Point::new(0.0, 0.99, -2.0), Vector::new(0.0, 0.0, 1.0));
-        let is = vec![
-            Intersection { t: 1.8589, object: &shape }
-        ];
+        let is = vec![Intersection {
+            t: 1.8589,
+            object: &shape,
+        }];
         let i = is[0];
         let comps = i.precompute(&r, &is);
         assert!((comps.schlick() - 0.48873).abs() < EPSILON);

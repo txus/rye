@@ -50,7 +50,7 @@ impl Pattern for StripePattern {
 }
 
 pub struct TestPattern {
-    pub transform: Matrix4
+    pub transform: Matrix4,
 }
 
 impl TestPattern {

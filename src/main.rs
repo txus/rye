@@ -15,7 +15,7 @@ use light::PointLight;
 use linear::{Matrix4, Point, Vector};
 use materials::Material;
 use patterns::{CheckerPattern, GradientPattern, RingPattern, StripePattern};
-use shapes::{Plane, Cube, Cylinder, Shape, Sphere};
+use shapes::{Cube, Cylinder, Plane, Shape, Sphere};
 use world::World;
 
 use std::f32::consts::PI;
@@ -122,7 +122,10 @@ fn main() {
     cylinder.material.color = Color::blue();
 
     let mut floor = Plane::new();
-    floor.material.pattern = Some(Box::from(CheckerPattern::new(Color::white(), Color::black())));
+    floor.material.pattern = Some(Box::from(CheckerPattern::new(
+        Color::white(),
+        Color::black(),
+    )));
 
     let mut ball = Sphere::new();
     ball.set_material(Material {
