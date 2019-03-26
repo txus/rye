@@ -16,9 +16,9 @@ pub trait Pattern: Send + Sync {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StripePattern {
-    a: Color,
-    b: Color,
-    transform: Matrix4,
+    pub a: Color,
+    pub b: Color,
+    pub transform: Matrix4,
 }
 
 impl StripePattern {
@@ -77,9 +77,9 @@ impl Pattern for TestPattern {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GradientPattern {
-    a: Color,
-    b: Color,
-    transform: Matrix4,
+    pub a: Color,
+    pub b: Color,
+    pub transform: Matrix4,
 }
 
 impl GradientPattern {
@@ -110,9 +110,9 @@ impl Pattern for GradientPattern {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RingPattern {
-    a: Color,
-    b: Color,
-    transform: Matrix4,
+    pub a: Color,
+    pub b: Color,
+    pub transform: Matrix4,
 }
 
 impl RingPattern {
@@ -147,9 +147,9 @@ impl Pattern for RingPattern {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckerPattern {
-    a: Color,
-    b: Color,
-    transform: Matrix4,
+    pub a: Color,
+    pub b: Color,
+    pub transform: Matrix4,
 }
 
 impl CheckerPattern {

@@ -1,0 +1,109 @@
+camera:
+    at: [-2, 2.5, -3.5]
+    look_at: [2, 0, 3]
+    up: [0, 1, 0]
+    fov: 30
+light:
+    type: PointLight
+    at: [-5, 10, -5]
+    intensity: [1, 1, 1]
+
+objects:
+    - shape: Plane
+      at: [0, 0, 5]
+      rotate: [-90, 0, 0]
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+    - shape: Plane
+      at: [0, 0, -6]
+      rotate: [-90, 0, 0]
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+    - shape: Plane
+      at: [-6, 0, 0]
+      rotate: [0, 0, 90]
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+    - shape: Plane
+      at: [6, 0, 0]
+      rotate: [0, 0, 90]
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+    - shape: Plane
+      at: [0, 0, 0]
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+    - shape: Sphere
+      at: [-0.5, 1, 2]
+      scale: [2, 2, 2]
+      material:
+        color: [0, 0.4, 0.4]
+        shininess: 50
+        specular: 1
+        reflective: 0.8
+    - shape: Sphere
+      at: [2.2, 1, -1]
+      material:
+        color: [0.4, 0, 0.4]
+        shininess: 50
+        specular: 1
+        reflective: 0.2
+    - shape: Cylinder
+      at: [-3.5, 0, 1]
+      closed: true
+      minimum: -1
+      maximum: 3
+      material:
+        color: [0.4, 1, 0.4]
+        shininess: 20
+        specular: 1
+        reflective: 0.01
+        pattern:
+            type: Gradient
+            a: [0.4, 1, 0.4]
+            b: [1.0, 0.2, 1.0]
+            scale: [1.1, 1.1, 1.1]
+            rotate: [0, 90, 0]
+    - shape: Cube
+      at: [0.6, 0.4, -1]
+      rotate: [0, 60, 0]
+      scale: [0.4, 0.4, 0.4]
+      material:
+        color: [1, 0, 0.4]
+        shininess: 50
+        specular: 1
+        reflective: 0.3
+    - shape: Cube
+      at: [-0.5, 0.6, -0.8]
+      rotate: [0, 40, 0]
+      scale: [0.6, 0.6, 0.6]
+      casts_shadows: false
+      material:
+        color: [0, 0.4, 0.1]
+        specular: 1
+        shininess: 400
+        diffuse: 0.3
+        ambient: 0.1
+        reflective: 1
+        transparency: 1
+        refractive_index: 0.3

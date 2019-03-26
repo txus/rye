@@ -523,7 +523,6 @@ impl Shape for Cone {
             // if the body of the cone intersects
             let disc = b.powi(2) - 4.0 * a * c;
 
-            println!("disc {:?}", disc);
             if disc >= 0.0 {
                 let sq = disc.sqrt();
                 let t0 = (-b - sq) / (2.0 * a);

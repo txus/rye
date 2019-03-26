@@ -41,6 +41,14 @@ impl World {
         }
     }
 
+    pub fn empty() -> Self {
+        let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
+        World {
+            objects: vec![],
+            light_source: light,
+        }
+    }
+
     pub fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let mut out: Vec<Intersection> = vec![];
         for object in &self.objects {
