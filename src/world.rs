@@ -86,7 +86,7 @@ impl World {
     pub fn color_at(&self, r: &Ray, remaining: usize) -> Color {
         let intersections = self.intersect(&r);
         if let Some(hit) = Intersection::hit(&intersections) {
-            self.shade(&hit.precompute(&r, &intersections), remaining)
+            self.shade(&hit.precompute(&self.registry, &r, &intersections), remaining)
         } else {
             Color::black()
         }
@@ -174,10 +174,17 @@ mod tests {
     #[test]
     fn precomputing_state_of_intersection() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s: Box<Shape> = Box::from(Sphere::new());
-        let i = Intersection { t: 4.0, object: &s };
+        let registry = Rc::new(RefCell::new(Registry::new()));
+        let id;
+        {
+            let mut reg = registry.borrow_mut();
+            id = reg.register(Box::from(Sphere::new()));
+        }
+        let reg = registry.borrow();
+        let s = reg.get(id).unwrap();
+        let i = Intersection { t: 4.0, object: s };
         let is = [i];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert_eq!(comps.point, Point::new(0.0, 0.0, -1.0));
         assert_eq!(comps.eye, Vector::new(0.0, 0.0, -1.0));
         assert_eq!(comps.normal, Vector::new(0.0, 0.0, -1.0));
@@ -193,7 +200,7 @@ mod tests {
             object: shape,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&w.registry, &r, &is);
         assert_eq!(w.shade(&comps, 1), Color::new(0.38066, 0.47583, 0.2855));
     }
 
@@ -208,7 +215,7 @@ mod tests {
             object: shape,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&w.registry, &r, &is);
         assert_eq!(w.shade(&comps, 1), Color::new(0.90498, 0.90498, 0.90498));
     }
 
@@ -259,11 +266,20 @@ mod tests {
     #[test]
     fn hit_should_offset_the_point() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut s: Box<Shape> = Box::from(Sphere::new());
-        s.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
-        let i = Intersection { t: 5.0, object: &s };
+        let registry = Rc::new(RefCell::new(Registry::new()));
+        let id;
+        {
+            let mut reg = registry.borrow_mut();
+            id = reg.register(Box::from(Sphere::new()));
+            let s = reg.get_mut(id).unwrap();
+            s.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
+        }
+
+        let reg = registry.borrow();
+        let s = reg.get(id).unwrap();
+        let i = Intersection { t: 5.0, object: s };
         let mut is = [i];
-        let comps = i.precompute(&r, &mut is);
+        let comps = i.precompute(&reg, &r, &mut is);
         assert!(comps.over_point.z < -EPSILON / 2.0);
         assert!(comps.point.z > comps.over_point.z);
     }

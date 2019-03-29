@@ -16,25 +16,45 @@ fn gen_id() -> i32 {
 pub trait Shape: Send + Sync {
     fn id(&self) -> i32;
     fn set_tag(&mut self, id: NodeId);
-    fn tag(&self) -> Option<NodeId>;
+    fn tag(&self) -> NodeId;
     fn casts_shadows(&self) -> bool;
     fn transform(&self) -> &Matrix4;
     fn inverse_transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
     fn material(&self) -> &Material;
     fn set_material(&mut self, m: Material);
-    fn normal(&self, world_point: Point) -> Vector {
-        let inverse = self.inverse_transform();
-        let object_point = *inverse * world_point;
-        let object_normal = self.local_normal_at(&object_point);
-        let world_normal = inverse.transpose() * object_normal;
-        world_normal.normalize()
+    fn normal(&self, reg: &Registry, world_point: Point) -> Vector {
+        println!("localpoint?");
+        let local_point = self.world_to_object(&reg, &world_point);
+        println!("localnormal?");
+        let local_normal = self.local_normal_at(&local_point);
+        println!("normaltoworld?");
+        self.normal_to_world(&reg, &local_normal)
     }
     fn local_normal_at(&self, p: &Point) -> Vector;
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>>;
     fn intersect<'a>(&'a self, reg: &'a Registry, r: &Ray) -> Vec<Intersection<'a>> {
         let ray = r.transform(self.inverse_transform());
         self.local_intersect(&reg, &ray)
+    }
+    fn world_to_object(&self, reg: &Registry, p: &Point) -> Point {
+        let point = if let Some(parent) = reg.parent(self.tag()) {
+            parent.world_to_object(&reg, p)
+        } else {
+            p.clone()
+        };
+        *self.inverse_transform() * point
+    }
+    fn normal_to_world(&self, reg: &Registry, normal: &Vector) -> Vector {
+        let n = (self.inverse_transform().transpose() * *normal).normalize();
+
+        let norm = if let Some(parent) = reg.parent(self.tag()) {
+            parent.normal_to_world(&reg, &n)
+        } else {
+            n
+        };
+
+        norm
     }
 }
 
@@ -88,8 +108,8 @@ impl Shape for Sphere {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -122,7 +142,7 @@ impl Shape for Sphere {
         let c = sphere_to_ray.dot(&sphere_to_ray) - 1.0;
         let discriminant = b.powi(2) - 4.0 * a * c;
 
-        let s: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+        let s: &Box<Shape> = reg.get(self.tag()).unwrap();
 
         if discriminant < 0.0 {
             vec![]
@@ -173,8 +193,8 @@ impl Shape for Plane {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -203,7 +223,7 @@ impl Shape for Plane {
             vec![]
         } else {
             let t = -(ray.origin.y) / ray.direction.y;
-            let shape: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+            let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
             vec![Intersection { t, object: shape }]
         }
     }
@@ -255,8 +275,8 @@ impl Shape for Cube {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -299,7 +319,7 @@ impl Shape for Cube {
         if tmin > tmax {
             vec![]
         } else {
-            let shape: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+            let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
             vec![
                 Intersection {
                     t: tmin,
@@ -365,7 +385,7 @@ impl Cylinder {
         if !self.closed || ray.direction.y.abs() < EPSILON {
             return is;
         }
-        let shape: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+        let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
         let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, lower_t) {
             is.push(Intersection {
@@ -392,8 +412,8 @@ impl Shape for Cylinder {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -443,7 +463,7 @@ impl Shape for Cylinder {
                     t0 = t1_;
                     t1 = t0_;
                 }
-                let shape: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+                let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
                 let y0 = ray.origin.y + t0 * ray.direction.y;
                 if self.minimum < y0 && y0 < self.maximum {
                     intersections.push(Intersection {
@@ -520,8 +540,8 @@ impl Shape for Cone {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -559,7 +579,7 @@ impl Shape for Cone {
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
         let o = ray.origin;
         let d = ray.direction;
-        let this: &Box<Shape> = reg.get(self.tag().unwrap()).unwrap();
+        let this: &Box<Shape> = reg.get(self.tag()).unwrap();
         let mut intersections = vec![];
         let a = d.x.powi(2) - d.y.powi(2) + d.z.powi(2);
         let b = 2.0 * o.x * d.x - 2.0 * o.y * d.y + 2.0 * o.z * d.z;
@@ -652,8 +672,8 @@ impl Shape for Group {
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
-    fn tag(&self) -> Option<NodeId> {
-        self.tag
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -675,10 +695,10 @@ impl Shape for Group {
         &self.inverse_transform
     }
     fn local_normal_at(&self, p: &Point) -> Vector {
-        Vector::new(0.0, 0.0, 0.0)
+        panic!("Calling local_normal_at in group");
     }
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
-        let children = reg.children(self.tag().unwrap());
+        let children = reg.children(self.tag());
         let mut is = vec![];
         for child in children {
             is.append(&mut child.intersect(&reg, &ray));
@@ -696,6 +716,7 @@ mod tests {
     use std::rc::Rc;
 
     struct TestShape {
+        tag: Option<NodeId>,
         transform: Matrix4,
         inverse_transform: Matrix4,
         material: Material,
@@ -705,6 +726,7 @@ mod tests {
     impl TestShape {
         pub fn new(expected_ray: Ray) -> TestShape {
             TestShape {
+                tag: None,
                 transform: Matrix4::id(),
                 material: Material::default(),
                 inverse_transform: Matrix4::id().inverse(),
@@ -718,9 +740,10 @@ mod tests {
             0
         }
         fn set_tag(&mut self, id: NodeId) {
+            self.tag = Some(id);
         }
-        fn tag(&self) -> Option<NodeId> {
-            None
+        fn tag(&self) -> NodeId {
+            self.tag.unwrap()
         }
         fn casts_shadows(&self) -> bool {
             true
@@ -779,22 +802,38 @@ mod tests {
 
     #[test]
     fn computing_normal_on_translated_shape() {
+        let registry = Rc::new(RefCell::new(Registry::new()));
         let expected_ray = Ray::new(Point::new(-5.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut s = TestShape::new(expected_ray);
-        s.set_transform(Matrix4::translation(0.0, 1.0, 0.0));
+        let id;
+        {
+            let mut reg = registry.borrow_mut();
+            let mut s = Box::from(TestShape::new(expected_ray));
+            s.set_transform(Matrix4::translation(0.0, 1.0, 0.0));
+            id = reg.register(s);
+        }
+        let reg = registry.borrow();
+        let s = reg.get(id).unwrap();
         assert_eq!(
-            s.normal(Point::new(0.0, 1.70711, -0.70711)),
+            s.normal(&reg, Point::new(0.0, 1.70711, -0.70711)),
             Vector::new(0.0, 0.70711, -0.70711)
         );
     }
 
     #[test]
     fn computing_normal_on_transformed_shape() {
+        let registry = Rc::new(RefCell::new(Registry::new()));
         let expected_ray = Ray::new(Point::new(-5.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut s = TestShape::new(expected_ray);
-        s.set_transform(Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0));
+        let id;
+        {
+            let mut reg = registry.borrow_mut();
+            let mut s = Box::from(TestShape::new(expected_ray));
+            s.set_transform(Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0));
+            id = reg.register(s);
+        }
+        let reg = registry.borrow();
+        let s = reg.get(id).unwrap();
         assert_eq!(
-            s.normal(Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
+            s.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
             Vector::new(0.0, 0.97014, -0.24254)
         );
     }
@@ -891,66 +930,85 @@ mod tests {
             assert_eq!(*s.transform(), t);
         }
 
-/*         #[test]
+        #[test]
         fn scaled_sphere_intersection() {
             let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+            let registry = Rc::new(RefCell::new(Registry::new()));
             let mut sph = Box::from(Sphere::new());
             sph.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
-            let reg_rc = Rc::new(RefCell::new(Registry::new()));
-            let mut mut_reg = reg_rc.borrow_mut();
-            let id = mut_reg.register(sph);
-            let reg = reg_rc.borrow();
+            let mut sph2 = Box::from(Sphere::new());
+            sph2.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
+            let id;
+            let id2;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(sph);
+                id2 = reg.register(sph2);
+            }
+            let reg = registry.borrow();
             let s = reg.get(id).unwrap();
+            let transformed = reg.get(id2).unwrap();
 
             assert_eq!(
                 s.intersect(&reg, &r).iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec!(3.0, 7.0)
             );
 
-            let mut sph2 = Box::from(Sphere::new());
-            sph2.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
-            let id2 = mut_reg.register(sph2);
-            let transformed = reg.get(id2).unwrap();
             assert_eq!(
                 transformed.intersect(&reg, &r).iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec!()
             );
-        } */
+        }
 
         #[test]
         fn normal() {
-            let mut s = Sphere::new();
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            let tid;
+            let srid;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(Sphere::new()));
+                let mut translated = Box::from(Sphere::new());
+                let mut scaled_and_rotated = Box::from(Sphere::new());
+                let translate = Matrix4::translation(0.0, 1.0, 0.0);
+                let scale_and_rotate = Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0);
+                translated.set_transform(translate);
+                scaled_and_rotated.set_transform(scale_and_rotate);
+
+                tid = reg.register(translated);
+                srid = reg.register(scaled_and_rotated);
+            }
+            let reg = registry.borrow();
+            let s = reg.get(id).unwrap();
             assert_eq!(
-                s.normal(Point::new(1.0, 0.0, 0.0)),
+                s.normal(&reg, Point::new(1.0, 0.0, 0.0)),
                 Vector::new(1.0, 0.0, 0.0)
             );
             assert_eq!(
-                s.normal(Point::new(0.0, 1.0, 0.0)),
+                s.normal(&reg, Point::new(0.0, 1.0, 0.0)),
                 Vector::new(0.0, 1.0, 0.0)
             );
             assert_eq!(
-                s.normal(Point::new(0.0, 0.0, 1.0)),
+                s.normal(&reg, Point::new(0.0, 0.0, 1.0)),
                 Vector::new(0.0, 0.0, 1.0)
             );
-            let v = s.normal(Point::new(
+            let v = s.normal(&reg, Point::new(
                 3_f32.sqrt() / 3.0,
                 3_f32.sqrt() / 3.0,
                 3_f32.sqrt() / 3.0,
             ));
             assert_eq!(v, v.normalize());
 
-            let translate = Matrix4::translation(0.0, 1.0, 0.0);
-            let scale_and_rotate = Matrix4::scaling(1.0, 0.5, 1.0) * Matrix4::rotation_z(PI / 5.0);
-
-            s.set_transform(translate);
+            let t = reg.get(tid).unwrap();
             assert_eq!(
-                s.normal(Point::new(0.0, 1.70711, -0.70711)),
+                t.normal(&reg, Point::new(0.0, 1.70711, -0.70711)),
                 Vector::new(0.0, 0.70711, -0.70711)
             );
 
-            s.set_transform(scale_and_rotate);
+            let sr = reg.get(srid).unwrap();
             assert_eq!(
-                s.normal(Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
+                sr.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
                 Vector::new(0.0, 0.970140, -0.24254)
             );
         }
@@ -1411,6 +1469,100 @@ mod tests {
                 .map(|x| x.object.id())
                 .collect::<Vec<i32>>();
             assert_eq!(hits, vec![s2uid, s2uid, s1uid, s1uid]);
+        }
+
+        #[test]
+        fn intersecting_transformed_group() {
+            let mut reg = Registry::new();
+            let id = reg.register(Box::from(Group::new()));
+            let mg = reg.get_mut(id).unwrap();
+            mg.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
+            let sid = reg.register(Box::from(Sphere::new()));
+            let ms = reg.get_mut(sid).unwrap();
+            ms.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
+            reg.add(id, sid);
+            let r = Ray::new(Point::new(10.0, 0.0, -10.0), Vector::new(0.0, 0.0, 1.0));
+
+            let g = reg.get(id).unwrap();
+
+            let hits = g
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.object.id())
+                .collect::<Vec<i32>>();
+            assert_eq!(hits.len(), 2);
+        }
+
+        #[test]
+        fn converting_point_from_world_to_object_space() {
+            let mut reg = Registry::new();
+
+            let id = reg.register(Box::from(Group::new()));
+            let mg = reg.get_mut(id).unwrap();
+            mg.set_transform(Matrix4::rotation_y(PI/2.0));
+
+            let id2 = reg.register(Box::from(Group::new()));
+            let mg2 = reg.get_mut(id2).unwrap();
+            mg2.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
+
+            let sid = reg.register(Box::from(Sphere::new()));
+            let ms = reg.get_mut(sid).unwrap();
+            ms.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
+
+            reg.add(id, id2);
+            reg.add(id2, sid);
+
+            let s = reg.get(sid).unwrap();
+            let p = s.world_to_object(&reg, &Point::new(-2.0, 0.0, -10.0));
+            assert_eq!(p, Point::new(0.0, 0.0, -1.0));
+        }
+
+        #[test]
+        fn converting_normal_vector_from_object_to_world_space() {
+            let mut reg = Registry::new();
+
+            let id = reg.register(Box::from(Group::new()));
+            let mg = reg.get_mut(id).unwrap();
+            mg.set_transform(Matrix4::rotation_y(PI/2.0));
+
+            let id2 = reg.register(Box::from(Group::new()));
+            let mg2 = reg.get_mut(id2).unwrap();
+            mg2.set_transform(Matrix4::scaling(1.0, 2.0, 3.0));
+
+            let sid = reg.register(Box::from(Sphere::new()));
+            let ms = reg.get_mut(sid).unwrap();
+            ms.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
+
+            reg.add(id, id2);
+            reg.add(id2, sid);
+
+            let s = reg.get(sid).unwrap();
+            let v = s.normal_to_world(&reg, &Vector::new(3_f32.sqrt()/3.0, 3_f32.sqrt()/3.0, 3_f32.sqrt()/3.0));
+            assert_eq!(v, Vector::new(0.2857, 0.4286, -0.8571));
+        }
+
+        #[test]
+        fn finding_normal_on_child_object() {
+            let mut reg = Registry::new();
+
+            let id = reg.register(Box::from(Group::new()));
+            let mg = reg.get_mut(id).unwrap();
+            mg.set_transform(Matrix4::rotation_y(PI/2.0));
+
+            let id2 = reg.register(Box::from(Group::new()));
+            let mg2 = reg.get_mut(id2).unwrap();
+            mg2.set_transform(Matrix4::scaling(1.0, 2.0, 3.0));
+
+            let sid = reg.register(Box::from(Sphere::new()));
+            let ms = reg.get_mut(sid).unwrap();
+            ms.set_transform(Matrix4::translation(5.0, 0.0, 0.0));
+
+            reg.add(id, id2);
+            reg.add(id2, sid);
+
+            let s = reg.get(sid).unwrap();
+            let v = s.normal(&reg, Point::new(1.7321, 1.1547, -5.5774));
+            assert_eq!(v, Vector::new(0.2857, 0.4286, -0.8571));
         }
     }
 }

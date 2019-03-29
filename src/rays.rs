@@ -1,5 +1,6 @@
 use crate::linear::{Matrix4, Point, Vector, EPSILON};
 use crate::shapes::Shape;
+use crate::registry::Registry;
 
 pub struct Ray {
     pub origin: Point,
@@ -78,9 +79,9 @@ impl<'a> Intersection<'a> {
         }
     }
 
-    pub fn precompute(&self, r: &Ray, is: &'a [Intersection<'a>]) -> Precomputation {
+    pub fn precompute(&self, reg: &Registry, r: &Ray, is: &'a [Intersection<'a>]) -> Precomputation {
         let point = r.position(self.t);
-        let normal = self.object.normal(point);
+        let normal = self.object.normal(&reg, point);
         let eye = -r.direction;
         let inside = normal.dot(&eye) < 0.0;
         let n = if inside { -normal } else { normal };
@@ -193,21 +194,25 @@ mod tests {
 
     #[test]
     fn hit_when_intersection_occurs_on_outside() {
+        let mut reg = Registry::new();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s: Box<Shape> = Box::from(Sphere::new());
-        let i = Intersection { t: 4.0, object: &s };
+        let id = reg.register(Box::from(Sphere::new()));
+        let s = reg.get(id).unwrap();
+        let i = Intersection { t: 4.0, object: s };
         let is = [i];
-        let c = i.precompute(&r, &is);
+        let c = i.precompute(&reg, &r, &is);
         assert_eq!(c.inside, false);
     }
 
     #[test]
     fn hit_when_intersection_occurs_on_inside() {
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
-        let s: Box<Shape> = Box::from(Sphere::new());
-        let i = Intersection { t: 1.0, object: &s };
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::new()));
+        let s = reg.get(id).unwrap();
+        let i = Intersection { t: 1.0, object: s };
         let mut is = [i];
-        let c = i.precompute(&r, &mut is);
+        let c = i.precompute(&reg, &r, &mut is);
         assert_eq!(c.point, Point::new(0.0, 0.0, 1.0));
         assert_eq!(c.eye, Vector::new(0.0, 0.0, -1.0));
         assert_eq!(c.normal, Vector::new(0.0, 0.0, -1.0));
@@ -217,10 +222,12 @@ mod tests {
     #[test]
     fn precomputing_state_intersection() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s: Box<Shape> = Box::from(Sphere::new());
-        let i = Intersection { t: 4.0, object: &s };
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::new()));
+        let s = reg.get(id).unwrap();
+        let i = Intersection { t: 4.0, object: s };
         let mut is = [i];
-        let c = i.precompute(&r, &mut is);
+        let c = i.precompute(&reg, &r, &mut is);
         assert_eq!(c.t, i.t);
         assert_eq!(c.point, Point::new(0.0, 0.0, -1.0));
         assert_eq!(c.eye, Vector::new(0.0, 0.0, -1.0));
@@ -229,17 +236,19 @@ mod tests {
 
     #[test]
     fn precomputing_reflect_vector() {
-        let s: Box<Shape> = Box::from(Plane::new());
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Plane::new()));
+        let s = reg.get(id).unwrap();
         let r = Ray::new(
             Point::new(0.0, 1.0, -1.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
         let i = Intersection {
             t: 2_f32.sqrt(),
-            object: &s,
+            object: s,
         };
         let mut is = [i];
-        let c = i.precompute(&r, &mut is);
+        let c = i.precompute(&reg, &r, &mut is);
         assert_eq!(
             c.reflect,
             Vector::new(0.0, 2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0)
@@ -266,38 +275,47 @@ mod tests {
 
     #[test]
     fn finding_n1_and_n2_at_various_intersection() {
-        let mut a: Box<Shape> = Box::from(Sphere::glass());
-        a.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
-        a.set_material(Material { refractive_index: 1.5, ..Material::default() });
+        let mut reg = Registry::new();
+        let aid = reg.register(Box::from(Sphere::glass()));
+        let bid = reg.register(Box::from(Sphere::glass()));
+        let cid = reg.register(Box::from(Sphere::glass()));
 
-        let mut b: Box<Shape> = Box::from(Sphere::glass());
-        b.set_transform(Matrix4::translation(0.0, 0.0, -0.25));
-        b.set_material(Material { refractive_index: 2.0, ..Material::default() });
+        let mut ma = reg.get_mut(aid).unwrap();
+        ma.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
+        ma.set_material(Material { refractive_index: 1.5, ..Material::default() });
 
-        let mut c: Box<Shape> = Box::from(Sphere::glass());
-        c.set_transform(Matrix4::translation(0.0, 0.0, 0.25));
-        c.set_material(Material { refractive_index: 2.5, ..Material::default() });
+        let mut mb = reg.get_mut(bid).unwrap();
+        mb.set_transform(Matrix4::translation(0.0, 0.0, -0.25));
+        mb.set_material(Material { refractive_index: 2.0, ..Material::default() });
+
+        let mut mc = reg.get_mut(cid).unwrap();
+        mc.set_transform(Matrix4::translation(0.0, 0.0, 0.25));
+        mc.set_material(Material { refractive_index: 2.5, ..Material::default() });
+
+        let a = reg.get(aid).unwrap();
+        let b = reg.get(bid).unwrap();
+        let c = reg.get(cid).unwrap();
 
         let r = Ray::new(Point::new(0.0, 0.0, -4.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
-            Intersection { t: 2.0, object: &a },
+            Intersection { t: 2.0, object: a },
             Intersection {
                 t: 2.75,
                 object: &b,
             },
             Intersection {
                 t: 3.25,
-                object: &c,
+                object: c,
             },
             Intersection {
                 t: 4.75,
-                object: &b,
+                object: b,
             },
             Intersection {
                 t: 5.25,
-                object: &c,
+                object: c,
             },
-            Intersection { t: 6.0, object: &a },
+            Intersection { t: 6.0, object: a },
         ];
 
         let results = vec![
@@ -311,7 +329,7 @@ mod tests {
 
         for idx in 0..6 {
             let i = is[idx];
-            let comps = i.precompute(&r, &is);
+            let comps = i.precompute(&reg, &r, &is);
             let (n1, n2) = results[idx];
             assert_eq!(comps.n1, n1);
             assert_eq!(comps.n2, n2);
@@ -321,21 +339,26 @@ mod tests {
     #[test]
     fn under_point_is_offset_below_the_surface() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut shape: Box<Shape> = Box::from(Sphere::glass());
-        shape.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::glass()));
+        let m = reg.get_mut(id).unwrap();
+        m.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
+        let s = reg.get(id).unwrap();
         let i = Intersection {
             t: 5.0,
-            object: &shape,
+            object: s,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert!(comps.under_point.z > EPSILON / 2.0);
         assert!(comps.point.z < comps.under_point.z);
     }
 
     #[test]
     fn schlick_approximation_under_total_internal_reflection() {
-        let shape: Box<Shape> = Box::from(Sphere::glass());
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::glass()));
+        let shape = reg.get(id).unwrap();
         let r = Ray::new(
             Point::new(0.0, 0.0, 2_f32.sqrt() / 2.0),
             Vector::new(0.0, 1.0, 0.0),
@@ -343,47 +366,51 @@ mod tests {
         let is = vec![
             Intersection {
                 t: -2_f32.sqrt() / 2.0,
-                object: &shape,
+                object: shape,
             },
             Intersection {
                 t: 2_f32.sqrt() / 2.0,
-                object: &shape,
+                object: shape,
             },
         ];
         let i = is[1];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert_eq!(comps.schlick(), 1.0);
     }
 
     #[test]
     fn schlick_approximation_with_a_perpendicular_viewing_angle() {
-        let shape: Box<Shape> = Box::from(Sphere::glass());
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::glass()));
+        let shape = reg.get(id).unwrap();
         let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
         let is = vec![
             Intersection {
                 t: -1.0,
-                object: &shape,
+                object: shape,
             },
             Intersection {
                 t: 1.0,
-                object: &shape,
+                object: shape,
             },
         ];
         let i = is[1];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert!((comps.schlick() - 0.04).abs() < EPSILON);
     }
 
     #[test]
     fn schlick_approximation_with_small_angle_and_n2_greater_than_n1() {
-        let shape: Box<Shape> = Box::from(Sphere::glass());
+        let mut reg = Registry::new();
+        let id = reg.register(Box::from(Sphere::glass()));
+        let shape = reg.get(id).unwrap();
         let r = Ray::new(Point::new(0.0, 0.99, -2.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![Intersection {
             t: 1.8589,
-            object: &shape,
+            object: shape,
         }];
         let i = is[0];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert!((comps.schlick() - 0.48873).abs() < EPSILON);
     }
 }
