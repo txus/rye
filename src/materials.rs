@@ -16,10 +16,26 @@ pub struct Material {
     pub pattern: Option<Box<Pattern>>,
 }
 
+const BASE: Material = Material {
+    color: Color { red: 1.0, green: 1.0, blue: 1.0 },
+    ambient: 0.1,
+    diffuse: 0.9,
+    specular: 0.9,
+    shininess: 200.0,
+    reflective: 0.0,
+    transparency: 0.0,
+    refractive_index: 1.0,
+    pattern: None,
+};
+
 impl Material {
+    pub fn base() -> &'static Material {
+        &BASE
+    }
+
     pub fn default() -> Material {
         Material {
-            color: Color::white(),
+            color: Color { red: 1.0, green: 1.0, blue: 1.0 },
             ambient: 0.1,
             diffuse: 0.9,
             specular: 0.9,

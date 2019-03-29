@@ -63,7 +63,8 @@ impl World {
     }
 
     pub fn shade(&self, c: &Precomputation, remaining: usize) -> Color {
-        let surface = c.object.material().lighting(
+        let material = c.object.material(&self.registry);
+        let surface = material.lighting(
             c.object,
             &self.light_source,
             &c.over_point,
@@ -74,7 +75,6 @@ impl World {
         let reflected = self.reflected_color(&c, remaining);
         let refracted = self.refracted_color(&c, remaining);
 
-        let material = c.object.material();
         if material.reflective > 0.0 && material.transparency > 0.0 {
             let reflectance = c.schlick();
             surface + reflected * reflectance + refracted * (1.0 - reflectance)
@@ -93,7 +93,7 @@ impl World {
     }
 
     pub fn reflected_color(&self, comps: &Precomputation, remaining: usize) -> Color {
-        let mat = comps.object.material();
+        let mat = comps.object.material(&self.registry);
         if remaining <= 0 || mat.reflective == 0.0 {
             Color::black()
         } else {
@@ -104,7 +104,8 @@ impl World {
     }
 
     pub fn refracted_color(&self, comps: &Precomputation, remaining: usize) -> Color {
-        if remaining == 0 || comps.object.material().transparency == 0.0 {
+        let mat = comps.object.material(&self.registry);
+        if remaining == 0 || mat.transparency == 0.0 {
             Color::black()
         } else {
             let n_ratio = comps.n1 / comps.n2;
@@ -117,7 +118,7 @@ impl World {
                 let direction =
                     (comps.normal * ((n_ratio * cos_i) - cos_t)) - (comps.eye * n_ratio);
                 let refract_ray = Ray::new(comps.under_point, direction);
-                self.color_at(&refract_ray, remaining - 1) * comps.object.material().transparency
+                self.color_at(&refract_ray, remaining - 1) * mat.transparency
             }
         }
     }
@@ -150,12 +151,12 @@ mod tests {
     fn default_world() {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
         let mut s1 = Sphere::new();
-        s1.material = Material {
+        s1.set_material(Material {
             color: Color::new(0.8, 1.0, 0.6),
             diffuse: 0.7,
             specular: 0.2,
-            ..s1.material
-        };
+            ..Material::default()
+        });
         let mut s2 = Sphere::new();
         s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
 
@@ -182,7 +183,7 @@ mod tests {
         }
         let reg = registry.borrow();
         let s = reg.get(id).unwrap();
-        let i = Intersection { t: 4.0, object: s };
+        let i = Intersection { uv: None, t: 4.0, object: s };
         let is = [i];
         let comps = i.precompute(&reg, &r, &is);
         assert_eq!(comps.point, Point::new(0.0, 0.0, -1.0));
@@ -195,7 +196,7 @@ mod tests {
         let w = World::default();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let shape: &Box<Shape> = w.registry.all().first().unwrap();
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 4.0,
             object: shape,
         };
@@ -210,7 +211,7 @@ mod tests {
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::white());
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
         let shape: &Box<Shape> = w.registry.all().last().unwrap();
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 0.5,
             object: shape,
         };
@@ -277,7 +278,7 @@ mod tests {
 
         let reg = registry.borrow();
         let s = reg.get(id).unwrap();
-        let i = Intersection { t: 5.0, object: s };
+        let i = Intersection { uv: None, t: 5.0, object: s };
         let mut is = [i];
         let comps = i.precompute(&reg, &r, &mut is);
         assert!(comps.over_point.z < -EPSILON / 2.0);
@@ -310,7 +311,7 @@ mod tests {
         let world = w.borrow();
         let reg = world.registry.all();
         let s = reg.last().unwrap();
-        i = Intersection {
+        i = Intersection { uv: None,
             t: 1.0,
             object: s,
         };
@@ -342,7 +343,7 @@ mod tests {
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 2_f32.sqrt(),
             object: &**plane,
         };
@@ -370,7 +371,7 @@ mod tests {
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 2_f32.sqrt(),
             object: &**plane,
         };
@@ -409,11 +410,11 @@ mod tests {
         let shape = world.registry.all().first().unwrap();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: 4.0,
                 object: &**shape,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 6.0,
                 object: &**shape,
             },
@@ -443,11 +444,11 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let shape = world.registry.all().first().unwrap();
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: 4.0,
                 object: &**shape,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 6.0,
                 object: &**shape,
             },
@@ -478,11 +479,11 @@ mod tests {
         );
         let shape = world.registry.all().first().unwrap();
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: -2_f32.sqrt(),
                 object: &**shape,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 2_f32.sqrt(),
                 object: &**shape,
             },
@@ -518,19 +519,19 @@ mod tests {
         let a = world.registry.all().first().unwrap();
         let b = world.registry.all().last().unwrap();
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: -0.9899,
                 object: &**a,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: -0.4899,
                 object: &**b,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 0.4899,
                 object: &**b,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 0.9899,
                 object: &**a,
             },
@@ -567,7 +568,7 @@ mod tests {
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
         let floor = world.registry.all().last().unwrap();
-        let is = vec![Intersection {
+        let is = vec![Intersection { uv: None,
             t: 2_f32.sqrt(),
             object: &**floor,
         }];
@@ -604,7 +605,7 @@ mod tests {
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
         let floor = world.registry.all().last().unwrap();
-        let is = vec![Intersection {
+        let is = vec![Intersection { uv: None,
             t: 2_f32.sqrt(),
             object: &**floor,
         }];

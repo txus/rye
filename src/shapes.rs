@@ -13,25 +13,34 @@ fn gen_id() -> i32 {
     rng.gen()
 }
 
+fn search_material(reg: &Registry, id: NodeId) -> &Material {
+    let mut mat = Material::base();
+    if let Some(parent) = reg.parent(id) {
+        mat = parent.material(reg)
+    }
+    mat
+}
+
+#[derive(Copy, Clone)]
+pub struct Bounds(Point, Point);
+
 pub trait Shape: Send + Sync {
     fn id(&self) -> i32;
+    fn bounds(&self, reg: &Registry) -> Bounds;
     fn set_tag(&mut self, id: NodeId);
     fn tag(&self) -> NodeId;
     fn casts_shadows(&self) -> bool;
     fn transform(&self) -> &Matrix4;
     fn inverse_transform(&self) -> &Matrix4;
     fn set_transform(&mut self, t: Matrix4);
-    fn material(&self) -> &Material;
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material;
     fn set_material(&mut self, m: Material);
-    fn normal(&self, reg: &Registry, world_point: Point) -> Vector {
-        println!("localpoint?");
+    fn normal(&self, reg: &Registry, world_point: Point, i: &Intersection) -> Vector {
         let local_point = self.world_to_object(&reg, &world_point);
-        println!("localnormal?");
-        let local_normal = self.local_normal_at(&local_point);
-        println!("normaltoworld?");
+        let local_normal = self.local_normal_at(&local_point, i);
         self.normal_to_world(&reg, &local_normal)
     }
-    fn local_normal_at(&self, p: &Point) -> Vector;
+    fn local_normal_at(&self, p: &Point, i: &Intersection) -> Vector;
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>>;
     fn intersect<'a>(&'a self, reg: &'a Registry, r: &Ray) -> Vec<Intersection<'a>> {
         let ray = r.transform(self.inverse_transform());
@@ -68,7 +77,7 @@ pub struct Sphere {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     pub inverse_transform: Matrix4,
 }
@@ -78,7 +87,7 @@ impl Sphere {
         Sphere {
             id: gen_id(),
             tag: None,
-            material: Material::default(),
+            material: None,
             transform: Matrix4::id(),
             casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
@@ -89,11 +98,11 @@ impl Sphere {
         Sphere {
             id: gen_id(),
             tag: None,
-            material: Material {
+            material: Some(Material {
                 transparency: 1.0,
                 refractive_index: 1.5,
                 ..Material::default()
-            },
+            }),
             transform: Matrix4::id(),
             casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
@@ -104,6 +113,9 @@ impl Sphere {
 impl Shape for Sphere {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn bounds(&self, reg: &Registry) -> Bounds {
+        Bounds(Point::new(-1.0, -1.0, -1.0), Point::new(1.0, 1.0, 1.0))
     }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
@@ -124,14 +136,18 @@ impl Shape for Sphere {
         self.transform = t;
         self.inverse_transform = t.inverse();
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m;
+        self.material = Some(m);
     }
 
-    fn local_normal_at(&self, p: &Point) -> Vector {
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
         *p - Point::origin()
     }
 
@@ -151,13 +167,13 @@ impl Shape for Sphere {
             let t2 = (-b + discriminant.sqrt()) / (a * 2.0);
             if t1 > t2 {
                 vec![
-                    Intersection { t: t2, object: s },
-                    Intersection { t: t1, object: s },
+                    Intersection { uv: None, t: t2, object: s },
+                    Intersection { uv: None, t: t1, object: s },
                 ]
             } else {
                 vec![
-                    Intersection { t: t1, object: s },
-                    Intersection { t: t2, object: s },
+                    Intersection { uv: None, t: t1, object: s },
+                    Intersection { uv: None, t: t2, object: s },
                 ]
             }
         }
@@ -168,7 +184,7 @@ pub struct Plane {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     inverse_transform: Matrix4,
 }
@@ -179,7 +195,7 @@ impl Plane {
             id: gen_id(),
             tag: None,
             transform: Matrix4::id(),
-            material: Material::default(),
+            material: None,
             casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
         }
@@ -189,6 +205,12 @@ impl Plane {
 impl Shape for Plane {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn bounds(&self, _reg: &Registry) -> Bounds {
+        Bounds(
+            Point::new(-INFINITY, -INFINITY, -INFINITY),
+            Point::new(INFINITY, INFINITY, INFINITY)
+            )
     }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
@@ -204,10 +226,14 @@ impl Shape for Plane {
         self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m
+        self.material = Some(m);
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn transform(&self) -> &Matrix4 {
         &self.transform
@@ -215,7 +241,7 @@ impl Shape for Plane {
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
-    fn local_normal_at(&self, _p: &Point) -> Vector {
+    fn local_normal_at(&self, _p: &Point, _i: &Intersection) -> Vector {
         Vector::new(0.0, 1.0, 0.0)
     }
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
@@ -224,7 +250,7 @@ impl Shape for Plane {
         } else {
             let t = -(ray.origin.y) / ray.direction.y;
             let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
-            vec![Intersection { t, object: shape }]
+            vec![Intersection { uv: None, t, object: shape }]
         }
     }
 }
@@ -233,7 +259,7 @@ pub struct Cube {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     inverse_transform: Matrix4,
 }
@@ -244,7 +270,7 @@ impl Cube {
             id: gen_id(),
             tag: None,
             transform: Matrix4::id(),
-            material: Material::default(),
+            material: None,
             casts_shadows: true,
             inverse_transform: Matrix4::id().inverse(),
         }
@@ -272,6 +298,12 @@ impl Shape for Cube {
     fn id(&self) -> i32 {
         self.id
     }
+    fn bounds(&self, reg: &Registry) -> Bounds {
+        Bounds(
+            Point::new(-1.0, -1.0, -1.0),
+            Point::new(1.0, 1.0, 1.0)
+            )
+    }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
@@ -286,10 +318,14 @@ impl Shape for Cube {
         self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m
+        self.material = Some(m);
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn transform(&self) -> &Matrix4 {
         &self.transform
@@ -297,7 +333,7 @@ impl Shape for Cube {
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
-    fn local_normal_at(&self, p: &Point) -> Vector {
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
         let (x, y, z) = (p.x.abs(), p.y.abs(), p.z.abs());
         let maxc = x.max(y).max(z);
         if maxc == x {
@@ -321,11 +357,11 @@ impl Shape for Cube {
         } else {
             let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
             vec![
-                Intersection {
+                Intersection { uv: None,
                     t: tmin,
                     object: shape,
                 },
-                Intersection {
+                Intersection { uv: None,
                     t: tmax,
                     object: shape,
                 },
@@ -338,7 +374,7 @@ pub struct Cylinder {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     pub minimum: f32,
     pub maximum: f32,
@@ -352,7 +388,7 @@ impl Cylinder {
             id: gen_id(),
             tag: None,
             transform: Matrix4::id(),
-            material: Material::default(),
+            material: None,
             casts_shadows: true,
             minimum: -INFINITY,
             maximum: INFINITY,
@@ -388,7 +424,7 @@ impl Cylinder {
         let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
         let lower_t = (self.minimum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, lower_t) {
-            is.push(Intersection {
+            is.push(Intersection { uv: None,
                 t: lower_t,
                 object: shape,
             })
@@ -396,7 +432,7 @@ impl Cylinder {
 
         let upper_t = (self.maximum - ray.origin.y) / ray.direction.y;
         if Self::check_cap(ray, upper_t) {
-            is.push(Intersection {
+            is.push(Intersection { uv: None,
                 t: upper_t,
                 object: shape,
             })
@@ -408,6 +444,9 @@ impl Cylinder {
 impl Shape for Cylinder {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn bounds(&self, reg: &Registry) -> Bounds {
+        Bounds(Point::new(-1.0, self.minimum, -1.0), Point::new(1.0, self.maximum, 1.0))
     }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
@@ -423,10 +462,14 @@ impl Shape for Cylinder {
         self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m
+        self.material = Some(m);
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn transform(&self) -> &Matrix4 {
         &self.transform
@@ -434,7 +477,7 @@ impl Shape for Cylinder {
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
-    fn local_normal_at(&self, p: &Point) -> Vector {
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
         let dist = p.x.powi(2) + p.z.powi(2);
         if dist < 1.0 && p.y >= self.maximum - EPSILON {
             Vector::new(0.0, 1.0, 0.0)
@@ -466,14 +509,14 @@ impl Shape for Cylinder {
                 let shape: &Box<Shape> = reg.get(self.tag()).unwrap();
                 let y0 = ray.origin.y + t0 * ray.direction.y;
                 if self.minimum < y0 && y0 < self.maximum {
-                    intersections.push(Intersection {
+                    intersections.push(Intersection { uv: None,
                         t: t0,
                         object: shape,
                     });
                 }
                 let y1 = ray.origin.y + t1 * ray.direction.y;
                 if self.minimum < y1 && y1 < self.maximum {
-                    intersections.push(Intersection {
+                    intersections.push(Intersection { uv: None,
                         t: t1,
                         object: shape,
                     });
@@ -490,7 +533,7 @@ pub struct Cone {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     pub minimum: f32,
     pub maximum: f32,
@@ -504,7 +547,7 @@ impl Cone {
             id: gen_id(),
             tag: None,
             transform: Matrix4::id(),
-            material: Material::default(),
+            material: None,
             casts_shadows: true,
             minimum: -INFINITY,
             maximum: INFINITY,
@@ -537,6 +580,10 @@ impl Shape for Cone {
     fn id(&self) -> i32 {
         self.id
     }
+    fn bounds(&self, reg: &Registry) -> Bounds {
+        let max = self.minimum.abs().max(self.maximum.abs());
+        Bounds(Point::new(-max, self.minimum, -max), Point::new(max, self.maximum, max))
+    }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
     }
@@ -551,10 +598,14 @@ impl Shape for Cone {
         self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m
+        self.material = Some(m);
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn transform(&self) -> &Matrix4 {
         &self.transform
@@ -562,7 +613,7 @@ impl Shape for Cone {
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
-    fn local_normal_at(&self, p: &Point) -> Vector {
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
         let dist = p.x.powi(2) + p.z.powi(2);
         if dist < 1.0 && p.y >= self.maximum - EPSILON {
             Vector::new(0.0, 1.0, 0.0)
@@ -595,14 +646,14 @@ impl Shape for Cone {
 
                 let y0 = ray.origin.y + t0 * ray.direction.y;
                 if self.minimum < y0 && y0 < self.maximum {
-                    intersections.push(Intersection {
+                    intersections.push(Intersection { uv: None,
                         t: t0,
                         object: this,
                     });
                 }
                 let y1 = ray.origin.y + t1 * ray.direction.y;
                 if self.minimum < y1 && y1 < self.maximum {
-                    intersections.push(Intersection {
+                    intersections.push(Intersection { uv: None,
                         t: t1,
                         object: this,
                     });
@@ -613,7 +664,7 @@ impl Shape for Cone {
                 let t = -c / (2.0 * b);
                 let y = ray.origin.y + t * ray.direction.y;
                 if self.minimum < y && y < self.maximum {
-                    intersections.push(Intersection {
+                    intersections.push(Intersection { uv: None,
                         t: t,
                         object: this,
                     });
@@ -624,7 +675,7 @@ impl Shape for Cone {
         if self.closed && ray.direction.y.abs() > EPSILON {
             let t0 = (self.minimum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.minimum.abs(), t0) {
-                intersections.push(Intersection {
+                intersections.push(Intersection { uv: None,
                     t: t0,
                     object: this,
                 });
@@ -632,7 +683,7 @@ impl Shape for Cone {
 
             let t1 = (self.maximum - ray.origin.y) / ray.direction.y;
             if Self::check_cap(ray, self.maximum.abs(), t1) {
-                intersections.push(Intersection {
+                intersections.push(Intersection { uv: None,
                     t: t1,
                     object: this,
                 });
@@ -646,9 +697,10 @@ pub struct Group {
     pub id: i32,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
-    pub material: Material,
+    pub material: Option<Material>,
     pub casts_shadows: bool,
     inverse_transform: Matrix4,
+    bounds: Bounds,
 }
 
 impl Group {
@@ -659,15 +711,26 @@ impl Group {
             tag: None,
             transform: transform,
             inverse_transform: transform.inverse(),
-            material: Material::default(),
-            casts_shadows: true
+            material: None,
+            casts_shadows: true,
+            bounds: Bounds(
+                Point::new(-INFINITY, -INFINITY, -INFINITY),
+                Point::new(INFINITY, INFINITY, INFINITY),
+                )
         }
+    }
+
+    pub fn precompute_bounds(&mut self, reg: &Registry) {
+        //let children = reg.children(self.tag());
     }
 }
 
 impl Shape for Group {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn bounds(&self, _reg: &Registry) -> Bounds {
+        self.bounds.clone()
     }
     fn set_tag(&mut self, id: NodeId) {
         self.tag = Some(id);
@@ -683,10 +746,14 @@ impl Shape for Group {
         self.inverse_transform = t.inverse();
     }
     fn set_material(&mut self, m: Material) {
-        self.material = m
+        self.material = Some(m);
     }
-    fn material(&self) -> &Material {
-        &self.material
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
     }
     fn transform(&self) -> &Matrix4 {
         &self.transform
@@ -694,7 +761,7 @@ impl Shape for Group {
     fn inverse_transform(&self) -> &Matrix4 {
         &self.inverse_transform
     }
-    fn local_normal_at(&self, p: &Point) -> Vector {
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
         panic!("Calling local_normal_at in group");
     }
     fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
@@ -708,6 +775,211 @@ impl Shape for Group {
     }
 }
 
+pub struct Triangle {
+    a: Point,
+    b: Point,
+    c: Point,
+    e1: Vector,
+    e2: Vector,
+    pub normal: Vector,
+    tag: Option<NodeId>,
+    id: i32,
+    casts_shadows: bool,
+    transform: Matrix4,
+    inverse_transform: Matrix4,
+    material: Option<Material>,
+}
+
+impl Triangle {
+    pub fn new(a: Point, b: Point, c: Point) -> Triangle {
+        let e1 = b - a;
+        let e2 = c - a;
+        let normal = e2.cross(&e1).normalize();
+        Triangle {
+            a, b, c, e1, e2, normal,
+            id: 0, //gen_id(),
+            casts_shadows: true,
+            transform: Matrix4::id(),
+            tag: None,
+            inverse_transform: Matrix4::id().inverse(),
+            material: None,
+            }
+    }
+}
+
+impl Shape for Triangle {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn bounds(&self, _reg: &Registry) -> Bounds {
+        Bounds(
+            Point::new(-INFINITY, -INFINITY, -INFINITY),
+            Point::new(INFINITY, INFINITY, INFINITY),
+            )
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = Some(m)
+    }
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
+        self.normal
+    }
+    fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
+        let dir_cross_e2 = ray.direction.cross(&self.e2);
+        let det = self.e1.dot(&dir_cross_e2);
+        if det.abs() < EPSILON {
+            vec![]
+        } else {
+            let f = 1.0 / det;
+            let p1_to_origin = ray.origin - self.a;
+            let u = f * p1_to_origin.dot(&dir_cross_e2);
+            if u < 0.0 || u > 1.0 {
+                vec![]
+            } else {
+                let origin_cross_e1 = p1_to_origin.cross(&self.e1);
+                let v = f * ray.direction.dot(&origin_cross_e1);
+                if v < 0.0 || (u + v) > 1.0 {
+                    vec![]
+                } else {
+                    let t = f * self.e2.dot(&origin_cross_e1);
+                    let shape = reg.get(self.tag()).unwrap();
+                    vec![Intersection { uv: None, t: t, object: shape }]
+                }
+            }
+        }
+    }
+}
+
+pub struct SmoothTriangle {
+    a: Point,
+    b: Point,
+    c: Point,
+    n1: Vector,
+    n2: Vector,
+    n3: Vector,
+
+    e1: Vector,
+    e2: Vector,
+
+    tag: Option<NodeId>,
+    id: i32,
+    casts_shadows: bool,
+    transform: Matrix4,
+    inverse_transform: Matrix4,
+    material: Option<Material>,
+}
+
+impl SmoothTriangle {
+    pub fn new(a: Point, b: Point, c: Point, n1: Vector, n2: Vector, n3: Vector) -> SmoothTriangle {
+        let e1 = b - a;
+        let e2 = c - a;
+        SmoothTriangle {
+            a, b, c, n1, n2, n3, e1, e2,
+            id: 0, //gen_id(),
+            casts_shadows: true,
+            transform: Matrix4::id(),
+            tag: None,
+            inverse_transform: Matrix4::id().inverse(),
+            material: None,
+            }
+    }
+}
+
+impl Shape for SmoothTriangle {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn bounds(&self, _reg: &Registry) -> Bounds {
+        Bounds(
+            Point::new(-INFINITY, -INFINITY, -INFINITY),
+            Point::new(INFINITY, INFINITY, INFINITY),
+            )
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = Some(m)
+    }
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point, i: &Intersection) -> Vector {
+        let (u,v) = i.uv.unwrap();
+        self.n2 * u + self.n3 * v + self.n1 * (1.0 - u - v)
+    }
+    fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection<'a>> {
+        let dir_cross_e2 = ray.direction.cross(&self.e2);
+        let det = self.e1.dot(&dir_cross_e2);
+        if det.abs() < EPSILON {
+            vec![]
+        } else {
+            let f = 1.0 / det;
+            let p1_to_origin = ray.origin - self.a;
+            let u = f * p1_to_origin.dot(&dir_cross_e2);
+            if u < 0.0 || u > 1.0 {
+                vec![]
+            } else {
+                let origin_cross_e1 = p1_to_origin.cross(&self.e1);
+                let v = f * ray.direction.dot(&origin_cross_e1);
+                if v < 0.0 || (u + v) > 1.0 {
+                    vec![]
+                } else {
+                    let t = f * self.e2.dot(&origin_cross_e1);
+                    let shape = reg.get(self.tag()).unwrap();
+                    vec![Intersection { uv: Some((u,v)), t: t, object: shape }]
+                }
+            }
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -715,11 +987,12 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
+
     struct TestShape {
         tag: Option<NodeId>,
         transform: Matrix4,
         inverse_transform: Matrix4,
-        material: Material,
+        material: Option<Material>,
         expected_ray: Ray,
     }
 
@@ -728,7 +1001,7 @@ mod tests {
             TestShape {
                 tag: None,
                 transform: Matrix4::id(),
-                material: Material::default(),
+                material: None,
                 inverse_transform: Matrix4::id().inverse(),
                 expected_ray,
             }
@@ -738,6 +1011,12 @@ mod tests {
     impl Shape for TestShape {
         fn id(&self) -> i32 {
             0
+        }
+        fn bounds(&self, _reg: &Registry) -> Bounds {
+            Bounds(
+                Point::new(-INFINITY, -INFINITY, -INFINITY),
+                Point::new(INFINITY, INFINITY, INFINITY)
+                )
         }
         fn set_tag(&mut self, id: NodeId) {
             self.tag = Some(id);
@@ -749,10 +1028,10 @@ mod tests {
             true
         }
         fn set_material(&mut self, m: Material) {
-            self.material = m;
+            self.material = Some(m)
         }
-        fn material(&self) -> &Material {
-            &self.material
+        fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+            Material::base()
         }
         fn set_transform(&mut self, t: Matrix4) {
             self.transform = t;
@@ -775,7 +1054,7 @@ mod tests {
             vec![]
         }
 
-        fn local_normal_at(&self, p: &Point) -> Vector {
+        fn local_normal_at(&self, p: &Point, _i: &Intersection) -> Vector {
             Vector::new(p.x, p.y, p.z)
         }
     }
@@ -813,8 +1092,10 @@ mod tests {
         }
         let reg = registry.borrow();
         let s = reg.get(id).unwrap();
+        let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
         assert_eq!(
-            s.normal(&reg, Point::new(0.0, 1.70711, -0.70711)),
+            s.normal(&reg, Point::new(0.0, 1.70711, -0.70711), &i),
             Vector::new(0.0, 0.70711, -0.70711)
         );
     }
@@ -832,8 +1113,10 @@ mod tests {
         }
         let reg = registry.borrow();
         let s = reg.get(id).unwrap();
+        let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
         assert_eq!(
-            s.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
+            s.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0), &i),
             Vector::new(0.0, 0.97014, -0.24254)
         );
     }
@@ -844,16 +1127,18 @@ mod tests {
         #[test]
         fn normal_is_constant() {
             let p = Plane::new();
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
             assert_eq!(
-                p.local_normal_at(&Point::origin()),
+                p.local_normal_at(&Point::origin(), &i),
                 Vector::new(0.0, 1.0, 0.0)
             );
             assert_eq!(
-                p.local_normal_at(&Point::new(10.0, 0.0, -10.0)),
+                p.local_normal_at(&Point::new(10.0, 0.0, -10.0), &i),
                 Vector::new(0.0, 1.0, 0.0)
             );
             assert_eq!(
-                p.local_normal_at(&Point::new(-5.0, 0.0, 150.0)),
+                p.local_normal_at(&Point::new(-5.0, 0.0, 150.0), &i),
                 Vector::new(0.0, 1.0, 0.0)
             );
         }
@@ -981,34 +1266,37 @@ mod tests {
             }
             let reg = registry.borrow();
             let s = reg.get(id).unwrap();
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+
             assert_eq!(
-                s.normal(&reg, Point::new(1.0, 0.0, 0.0)),
+                s.normal(&reg, Point::new(1.0, 0.0, 0.0), &i),
                 Vector::new(1.0, 0.0, 0.0)
             );
             assert_eq!(
-                s.normal(&reg, Point::new(0.0, 1.0, 0.0)),
+                s.normal(&reg, Point::new(0.0, 1.0, 0.0), &i),
                 Vector::new(0.0, 1.0, 0.0)
             );
             assert_eq!(
-                s.normal(&reg, Point::new(0.0, 0.0, 1.0)),
+                s.normal(&reg, Point::new(0.0, 0.0, 1.0), &i),
                 Vector::new(0.0, 0.0, 1.0)
             );
             let v = s.normal(&reg, Point::new(
                 3_f32.sqrt() / 3.0,
                 3_f32.sqrt() / 3.0,
                 3_f32.sqrt() / 3.0,
-            ));
+            ), &i);
             assert_eq!(v, v.normalize());
 
             let t = reg.get(tid).unwrap();
             assert_eq!(
-                t.normal(&reg, Point::new(0.0, 1.70711, -0.70711)),
+                t.normal(&reg, Point::new(0.0, 1.70711, -0.70711), &i),
                 Vector::new(0.0, 0.70711, -0.70711)
             );
 
             let sr = reg.get(srid).unwrap();
             assert_eq!(
-                sr.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0)),
+                sr.normal(&reg, Point::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0), &i),
                 Vector::new(0.0, 0.970140, -0.24254)
             );
         }
@@ -1162,8 +1450,11 @@ mod tests {
                 (Point::new(-1.0, -1.0, -1.0), Vector::new(-1.0, 0.0, 0.0)),
             ];
 
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+
             for (point, normal) in &examples {
-                assert_eq!(c.local_normal_at(&point), *normal);
+                assert_eq!(c.local_normal_at(&point, &i), *normal);
             }
         }
     }
@@ -1241,8 +1532,11 @@ mod tests {
                 (Point::new(-1.0, 1.0, 0.0), Vector::new(-1.0, 0.0, 0.0)),
             ];
 
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+
             for (point, normal) in &examples {
-                assert_eq!(c.local_normal_at(&point), *normal);
+                assert_eq!(c.local_normal_at(&point, &i), *normal);
             }
         }
 
@@ -1317,8 +1611,11 @@ mod tests {
                 (Point::new(0.0, 2.0, 0.5), Vector::new(0.0, 1.0, 0.0)),
             ];
 
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+
             for (point, direction) in &examples {
-                assert_eq!(c.local_normal_at(&point), *direction);
+                assert_eq!(c.local_normal_at(&point, &i), *direction);
             }
         }
     }
@@ -1414,8 +1711,11 @@ mod tests {
                 (Point::new(-1.0, -1.0, 0.0), Vector::new(-1.0, 1.0, 0.0)),
             ];
 
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+
             for (point, direction) in &examples {
-                assert_eq!(c.local_normal_at(&point), *direction);
+                assert_eq!(c.local_normal_at(&point, &i), *direction);
             }
         }
     }
@@ -1561,8 +1861,180 @@ mod tests {
             reg.add(id2, sid);
 
             let s = reg.get(sid).unwrap();
-            let v = s.normal(&reg, Point::new(1.7321, 1.1547, -5.5774));
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+            let v = s.normal(&reg, Point::new(1.7321, 1.1547, -5.5774), &i);
             assert_eq!(v, Vector::new(0.2857, 0.4286, -0.8571));
+        }
+    }
+
+    mod triangle {
+        use super::*;
+
+        #[test]
+        fn normal() {
+            let t = Triangle::new(
+                Point::new(0.0, 1.0, 0.0),
+                Point::new(-1.0, 0.0, 0.0),
+                Point::new(1.0, 0.0, 0.0),
+            );
+            let shape: Box<Shape> = Box::from(Sphere::new()); let i = Intersection { uv: None, t: 0.0, object: &shape };
+
+            let n1 = t.local_normal_at(&Point::new(0.0, 0.5, 0.0), &i);
+            let n2 = t.local_normal_at(&Point::new(-0.5, 0.75, 0.0), &i);
+            let n3 = t.local_normal_at(&Point::new(0.5, 0.25, 0.0), &i);
+            assert_eq!(n1, t.normal);
+            assert_eq!(n2, t.normal);
+            assert_eq!(n3, t.normal);
+        }
+
+        #[test]
+        fn intersecting_parallel_ray() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(Triangle::new(
+                    Point::new(0.0, 1.0, 0.0),
+                    Point::new(-1.0, 0.0, 0.0),
+                    Point::new(1.0, 0.0, 0.0),
+                )));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let r = Ray::new(Point::new(0.0, -1.0, -2.0), Vector::new(0.0, 1.0, 0.0));
+
+            let hits = t
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.object.id())
+                .collect::<Vec<i32>>();
+            assert_eq!(hits.len(), 0);
+        }
+
+        #[test]
+        fn ray_misses_p1_p3_edge() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(Triangle::new(
+                    Point::new(0.0, 1.0, 0.0),
+                    Point::new(-1.0, 0.0, 0.0),
+                    Point::new(1.0, 0.0, 0.0),
+                )));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let r = Ray::new(Point::new(-1.0, 1.0, -2.0), Vector::new(0.0, 0.0, 1.0));
+
+            let hits = t
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.object.id())
+                .collect::<Vec<i32>>();
+            assert_eq!(hits.len(), 0);
+        }
+
+        #[test]
+        fn ray_misses_p2_p3_edge() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(Triangle::new(
+                    Point::new(0.0, 1.0, 0.0),
+                    Point::new(-1.0, 0.0, 0.0),
+                    Point::new(1.0, 0.0, 0.0),
+                )));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let r = Ray::new(Point::new(0.0, -1.0, -2.0), Vector::new(0.0, 0.0, 1.0));
+
+            let hits = t
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.object.id())
+                .collect::<Vec<i32>>();
+            assert_eq!(hits.len(), 0);
+        }
+
+        #[test]
+        fn ray_strikes_triangle() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(Triangle::new(
+                    Point::new(0.0, 1.0, 0.0),
+                    Point::new(-1.0, 0.0, 0.0),
+                    Point::new(1.0, 0.0, 0.0),
+                )));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let r = Ray::new(Point::new(0.0, 0.5, -2.0), Vector::new(0.0, 0.0, 1.0));
+
+            let hits = t
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.t)
+                .collect::<Vec<f32>>();
+            assert_eq!(hits, vec![2.0]);
+        }
+    }
+
+    mod smooth_triangle {
+        use super::*;
+
+        fn tri() -> SmoothTriangle {
+            SmoothTriangle::new(
+                Point::new(0.0, 1.0, 0.0),
+                Point::new(-1.0, 0.0, 0.0),
+                Point::new(1.0, 0.0, 0.0),
+                Vector::new(0.0, 1.0, 0.0),
+                Vector::new(-1.0, 0.0, 0.0),
+                Vector::new(1.0, 0.0, 0.0),
+            )
+        }
+
+        #[test]
+        fn local_intersect() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(tri()));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let r = Ray::new(Point::new(-0.2, 0.3, -2.0), Vector::new(0.0, 0.0, 1.0));
+            let hits = t
+                .intersect(&reg, &r)
+                .iter()
+                .map(|x| x.uv.unwrap())
+                .collect::<Vec<(f32, f32)>>();
+            assert_eq!(hits, vec![(0.45, 0.25)]);
+        }
+
+        #[test]
+        fn normal() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+            let id;
+            {
+                let mut reg = registry.borrow_mut();
+                id = reg.register(Box::from(tri()));
+            }
+            let reg = registry.borrow();
+            let t = reg.get(id).unwrap();
+            let i = Intersection {
+                uv: Some((0.45, 0.25)),
+                t: 1.0,
+                object: &t
+            };
+            let v = t.normal(&reg, Point::origin(), &i);
+            assert_eq!(v, Vector::new(-0.5547, 0.83205, 0.0));
         }
     }
 }

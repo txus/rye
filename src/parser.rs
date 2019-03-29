@@ -3,13 +3,14 @@ use std::fs;
 use indextree::NodeId;
 use crate::light::PointLight;
 use crate::world::World;
-use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane};
+use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group};
 use crate::linear::{Point, Vector, Matrix4, Matrix};
 use crate::materials::Material;
 use crate::patterns::{Pattern, StripePattern, GradientPattern, RingPattern, CheckerPattern};
 use crate::color::Color;
 use crate::camera::{Camera, view_transform};
 use crate::registry::Registry;
+use crate::obj_parser;
 
 #[derive(Debug)]
 pub struct ParseError(String);
@@ -109,7 +110,7 @@ fn parse_transform(doc: &Yaml) -> (Matrix4, Matrix4, Matrix4) {
     (translation, rotation, scale)
 }
 
-fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<(), Error> {
+fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<NodeId, Error> {
     let (translation, rotation, scale) = parse_transform(&doc);
     let transform = translation * scale * rotation;
     let material = parse_material(&doc["material"]);
@@ -120,24 +121,24 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<(), Error> {
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             c.casts_shadows = casts_shadows;
-            reg.register(Box::from(c));
-            Ok(())
+            let id = reg.register(Box::from(c));
+            Ok(id)
         },
         Some("Sphere") => {
             let mut s = Sphere::new();
             s.set_transform(transform);
             if let Ok(m) = material { s.set_material(m) }
             s.casts_shadows = casts_shadows;
-            reg.register(Box::from(s));
-            Ok(())
+            let id = reg.register(Box::from(s));
+            Ok(id)
         },
         Some("Plane") => {
             let mut p = Plane::new();
             p.set_transform(transform);
             if let Ok(m) = material { p.set_material(m) }
             p.casts_shadows = casts_shadows;
-            reg.register(Box::from(p));
-            Ok(())
+            let id = reg.register(Box::from(p));
+            Ok(id)
         },
         Some("Cylinder") => {
             let mut c = Cylinder::new();
@@ -158,8 +159,8 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<(), Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            reg.register(Box::from(c));
-            Ok(())
+            let id = reg.register(Box::from(c));
+            Ok(id)
         },
         Some("Cone") => {
             let mut c = Cone::new();
@@ -180,10 +181,37 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<(), Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            reg.register(Box::from(c));
-            Ok(())
+            let id = reg.register(Box::from(c));
+            Ok(id)
+        },
+        Some("Group") => {
+            let mut g = Box::from(Group::new());
+            g.set_transform(transform);
+            if let Ok(m) = material { g.set_material(m) }
+            let gid = reg.register(g);
+
+            let obj_array = match &doc["children"] {
+                Yaml::Array(a) => Ok(a),
+                _ => Err(Error::Parse("'children' is not an array".to_owned()))
+            }?;
+
+            for o in obj_array.iter() {
+                let id = parse_object(reg, &o).unwrap();
+                reg.add(gid, id);
+            }
+
+            Ok(gid)
+        },
+        Some("Obj") => {
+            let filename = doc["filename"].as_str().expect("no filename in OBJ clause");
+            let results = obj_parser::read_filename(reg, &filename).unwrap();
+            let id = results.root;
+            let g = reg.get_mut(id).unwrap();
+            g.set_transform(transform);
+            if let Ok(m) = material { g.set_material(m) }
+            Ok(id)
         }
-        _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone"))
+        _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone, Group, Obj"))
     }
 }
 

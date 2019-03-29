@@ -24,6 +24,7 @@ impl Ray {
 #[derive(Clone, Copy)]
 pub struct Intersection<'a> {
     pub t: f32,
+    pub uv: Option<(f32, f32)>,
     pub object: &'a Box<Shape>,
 }
 
@@ -81,7 +82,7 @@ impl<'a> Intersection<'a> {
 
     pub fn precompute(&self, reg: &Registry, r: &Ray, is: &'a [Intersection<'a>]) -> Precomputation {
         let point = r.position(self.t);
-        let normal = self.object.normal(&reg, point);
+        let normal = self.object.normal(&reg, point, &self);
         let eye = -r.direction;
         let inside = normal.dot(&eye) < 0.0;
         let n = if inside { -normal } else { normal };
@@ -95,7 +96,7 @@ impl<'a> Intersection<'a> {
                 n1 = if containers.is_empty() {
                     1.0
                 } else {
-                    containers.last().unwrap().material().refractive_index
+                    containers.last().unwrap().material(reg).refractive_index
                 }
             }
             if let Some(_) = containers.iter().position(|x| x.id() == i.object.id()) {
@@ -108,7 +109,7 @@ impl<'a> Intersection<'a> {
                 n2 = if containers.is_empty() {
                     1.0
                 } else {
-                    containers.last().unwrap().material().refractive_index
+                    containers.last().unwrap().material(reg).refractive_index
                 }
             }
         }
@@ -159,22 +160,22 @@ mod tests {
     #[test]
     fn intersection_hits() {
         let s: Box<Shape> = Box::from(Sphere::new());
-        let mut i1 = Intersection { t: 1.0, object: &s };
-        let mut i2 = Intersection { t: 2.0, object: &s };
+        let mut i1 = Intersection { uv: None, t: 1.0, object: &s };
+        let mut i2 = Intersection { uv: None, t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&vec!(i1, i2)).unwrap().t, 1.0);
 
-        i1 = Intersection {
+        i1 = Intersection { uv: None,
             t: -1.0,
             object: &s,
         };
-        i2 = Intersection { t: 1.0, object: &s };
+        i2 = Intersection { uv: None, t: 1.0, object: &s };
         assert_eq!(Intersection::hit(&vec!(i1, i2)).unwrap().t, 1.0);
 
-        i1 = Intersection {
+        i1 = Intersection { uv: None,
             t: -2.0,
             object: &s,
         };
-        i2 = Intersection {
+        i2 = Intersection { uv: None,
             t: -1.0,
             object: &s,
         };
@@ -182,13 +183,13 @@ mod tests {
             assert!(false, "Something intersected when it shouldn't have")
         }
 
-        i1 = Intersection { t: 5.0, object: &s };
-        i2 = Intersection { t: 7.0, object: &s };
-        let i3 = Intersection {
+        i1 = Intersection { uv: None, t: 5.0, object: &s };
+        i2 = Intersection { uv: None, t: 7.0, object: &s };
+        let i3 = Intersection { uv: None,
             t: -3.0,
             object: &s,
         };
-        let i4 = Intersection { t: 2.0, object: &s };
+        let i4 = Intersection { uv: None, t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&vec!(i1, i2, i3, i4)).unwrap().t, 2.0);
     }
 
@@ -198,7 +199,7 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let id = reg.register(Box::from(Sphere::new()));
         let s = reg.get(id).unwrap();
-        let i = Intersection { t: 4.0, object: s };
+        let i = Intersection { uv: None, t: 4.0, object: s };
         let is = [i];
         let c = i.precompute(&reg, &r, &is);
         assert_eq!(c.inside, false);
@@ -210,7 +211,7 @@ mod tests {
         let mut reg = Registry::new();
         let id = reg.register(Box::from(Sphere::new()));
         let s = reg.get(id).unwrap();
-        let i = Intersection { t: 1.0, object: s };
+        let i = Intersection { uv: None, t: 1.0, object: s };
         let mut is = [i];
         let c = i.precompute(&reg, &r, &mut is);
         assert_eq!(c.point, Point::new(0.0, 0.0, 1.0));
@@ -225,7 +226,7 @@ mod tests {
         let mut reg = Registry::new();
         let id = reg.register(Box::from(Sphere::new()));
         let s = reg.get(id).unwrap();
-        let i = Intersection { t: 4.0, object: s };
+        let i = Intersection { uv: None, t: 4.0, object: s };
         let mut is = [i];
         let c = i.precompute(&reg, &r, &mut is);
         assert_eq!(c.t, i.t);
@@ -243,7 +244,7 @@ mod tests {
             Point::new(0.0, 1.0, -1.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 2_f32.sqrt(),
             object: s,
         };
@@ -298,24 +299,24 @@ mod tests {
 
         let r = Ray::new(Point::new(0.0, 0.0, -4.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
-            Intersection { t: 2.0, object: a },
-            Intersection {
+            Intersection { uv: None, t: 2.0, object: a },
+            Intersection { uv: None,
                 t: 2.75,
                 object: &b,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 3.25,
                 object: c,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 4.75,
                 object: b,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 5.25,
                 object: c,
             },
-            Intersection { t: 6.0, object: a },
+            Intersection { uv: None, t: 6.0, object: a },
         ];
 
         let results = vec![
@@ -344,7 +345,7 @@ mod tests {
         let m = reg.get_mut(id).unwrap();
         m.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
         let s = reg.get(id).unwrap();
-        let i = Intersection {
+        let i = Intersection { uv: None,
             t: 5.0,
             object: s,
         };
@@ -364,11 +365,11 @@ mod tests {
             Vector::new(0.0, 1.0, 0.0),
         );
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: -2_f32.sqrt() / 2.0,
                 object: shape,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 2_f32.sqrt() / 2.0,
                 object: shape,
             },
@@ -385,11 +386,11 @@ mod tests {
         let shape = reg.get(id).unwrap();
         let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
         let is = vec![
-            Intersection {
+            Intersection { uv: None,
                 t: -1.0,
                 object: shape,
             },
-            Intersection {
+            Intersection { uv: None,
                 t: 1.0,
                 object: shape,
             },
@@ -405,7 +406,7 @@ mod tests {
         let id = reg.register(Box::from(Sphere::glass()));
         let shape = reg.get(id).unwrap();
         let r = Ray::new(Point::new(0.0, 0.99, -2.0), Vector::new(0.0, 0.0, 1.0));
-        let is = vec![Intersection {
+        let is = vec![Intersection { uv: None,
             t: 1.8589,
             object: shape,
         }];

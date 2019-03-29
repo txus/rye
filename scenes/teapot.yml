@@ -1,0 +1,41 @@
+camera:
+    at: [-2, 2.5, -3.5]
+    look_at: [2, 0, 3]
+    up: [0, 1, 0]
+    fov: 30
+light:
+    type: PointLight
+    at: [-5, 10, -5]
+    intensity: [1, 1, 1]
+
+objects:
+    - shape: Group
+      material:
+        color: [0, 0, 0]
+        pattern:
+          type: Checker
+          a: [1, 1, 1]
+          b: [0.1, 0.1, 0.1]
+      children:
+        - shape: Plane
+          at: [0, 0, 5]
+          rotate: [-90, 0, 0]
+        - shape: Plane
+          at: [0, 0, -6]
+          rotate: [-90, 0, 0]
+        - shape: Plane
+          at: [-6, 0, 0]
+          rotate: [0, 0, 90]
+        - shape: Plane
+          at: [6, 0, 0]
+          rotate: [0, 0, 90]
+        - shape: Plane
+          at: [0, 0, 0]
+    - shape: Obj
+      filename: models/teapot_low.obj
+      rotate: [-90, 70, 0]
+      scale: [0.5, 0.5, 0.5]
+      material:
+        color: [0, 0.8, 0.8]
+        shininess: 50
+        specular: 1

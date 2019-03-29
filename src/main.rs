@@ -16,6 +16,7 @@ mod rays;
 mod shapes;
 mod world;
 mod parser;
+mod obj_parser;
 mod registry;
 
 /// A rye (tracer)
