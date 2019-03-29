@@ -1,5 +1,6 @@
 use yaml_rust::{YamlLoader, Yaml};
 use std::fs;
+use indextree::NodeId;
 use crate::light::PointLight;
 use crate::world::World;
 use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane};
@@ -8,6 +9,7 @@ use crate::materials::Material;
 use crate::patterns::{Pattern, StripePattern, GradientPattern, RingPattern, CheckerPattern};
 use crate::color::Color;
 use crate::camera::{Camera, view_transform};
+use crate::registry::Registry;
 
 #[derive(Debug)]
 pub struct ParseError(String);
@@ -107,7 +109,7 @@ fn parse_transform(doc: &Yaml) -> (Matrix4, Matrix4, Matrix4) {
     (translation, rotation, scale)
 }
 
-fn parse_object(doc: &Yaml) -> Result<Box<Shape>, Error> {
+fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<(), Error> {
     let (translation, rotation, scale) = parse_transform(&doc);
     let transform = translation * scale * rotation;
     let material = parse_material(&doc["material"]);
@@ -118,21 +120,24 @@ fn parse_object(doc: &Yaml) -> Result<Box<Shape>, Error> {
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             c.casts_shadows = casts_shadows;
-            Ok(Box::from(c))
+            reg.register(Box::from(c));
+            Ok(())
         },
         Some("Sphere") => {
             let mut s = Sphere::new();
             s.set_transform(transform);
             if let Ok(m) = material { s.set_material(m) }
             s.casts_shadows = casts_shadows;
-            Ok(Box::from(s))
+            reg.register(Box::from(s));
+            Ok(())
         },
         Some("Plane") => {
             let mut p = Plane::new();
             p.set_transform(transform);
             if let Ok(m) = material { p.set_material(m) }
             p.casts_shadows = casts_shadows;
-            Ok(Box::from(p))
+            reg.register(Box::from(p));
+            Ok(())
         },
         Some("Cylinder") => {
             let mut c = Cylinder::new();
@@ -153,7 +158,8 @@ fn parse_object(doc: &Yaml) -> Result<Box<Shape>, Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            Ok(Box::from(c))
+            reg.register(Box::from(c));
+            Ok(())
         },
         Some("Cone") => {
             let mut c = Cone::new();
@@ -174,7 +180,8 @@ fn parse_object(doc: &Yaml) -> Result<Box<Shape>, Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            Ok(Box::from(c))
+            reg.register(Box::from(c));
+            Ok(())
         }
         _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone"))
     }
@@ -184,19 +191,18 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
     let docs = YamlLoader::load_from_str(s).or(Err(Error::EmptyDocument))?;
     let doc = &docs[0];
     let light = parse_light(&doc["light"])?;
+    let mut w = World::empty();
 
     let obj_array = match &doc["objects"] {
         Yaml::Array(a) => Ok(a),
         _ => Err(Error::Parse("'objects' is not an array".to_owned()))
     }?;
 
-    let objects: Vec<Box<Shape>> = obj_array.iter().map(|o| {
-        parse_object(&o).unwrap()
-    }).collect();
+    for o in obj_array.iter() {
+        parse_object(&mut w.registry, &o).unwrap();
+    }
 
-    let mut w = World::empty();
     w.light_source = light;
-    w.objects = objects;
 
     let at = parse_point(&doc["camera"]["at"])?;
     let look_at = parse_point(&doc["camera"]["look_at"])?;
@@ -262,6 +268,6 @@ objects:
         let (world, _camera_at, _camera_look_at, _camera_up, _camera_fov) = read_string(&s).unwrap();
         assert_eq!(world.light_source.position, Point::new(1.0, 6.0, 5.0));
         assert_eq!(world.light_source.intensity, Color::white());
-        assert_eq!(world.objects.len(), 5);
+        assert_eq!(world.registry.all().len(), 5);
     }
 }

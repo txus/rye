@@ -28,8 +28,7 @@ impl Registry {
         group_id.append(child_id, &mut self.arena).unwrap();
     }
 
-    pub fn parent(&self, child: &Box<Shape>) -> Option<&Box<Shape>> {
-        let child_id = child.tag().unwrap();
+    pub fn parent(&self, child_id: NodeId) -> Option<&Box<Shape>> {
         let mut ancestors = child_id.ancestors(&self.arena);
         ancestors.next().unwrap(); // skip self
         let parent_id = ancestors.next()?;
@@ -37,9 +36,17 @@ impl Registry {
         Some(&parent.data)
     }
 
-    pub fn children(&self, group: &Box<Shape>) -> Vec<&Box<Shape>> {
-        let parent_id = group.tag().unwrap();
-        parent_id.children(&self.arena).map(|x| &self.arena.get(x).unwrap().data).collect()
+    pub fn children(&self, group_id: NodeId) -> Vec<&Box<Shape>> {
+        group_id.children(&self.arena).map(|x| &self.arena.get(x).unwrap().data).collect()
+    }
+
+    pub fn all(&self) -> Vec<&Box<Shape>> {
+        self.arena.iter().map(|x| &x.data).collect()
+    }
+
+    pub fn get_mut(&mut self, id: NodeId) -> Option<&mut Box<Shape>> {
+        let node = self.arena.get_mut(id)?;
+        Some(&mut node.data)
     }
 }
 
@@ -65,8 +72,7 @@ mod tests {
         let child_id = reg.register(s);
         let group_id = reg.register(g);
         reg.add(group_id, child_id);
-        let child = reg.get(child_id).unwrap();
-        assert_eq!(reg.parent(child).unwrap().id(), parent_id);
+        assert_eq!(reg.parent(child_id).unwrap().id(), parent_id);
     }
 
     #[test]
@@ -81,6 +87,6 @@ mod tests {
         let group_id = reg.register(g);
         reg.add(group_id, child_id);
         let parent = reg.get(group_id).unwrap();
-        assert_eq!(reg.children(parent).first().unwrap().id(), sphere_id);
+        assert_eq!(reg.children(group_id).first().unwrap().id(), sphere_id);
     }
 }

@@ -33,7 +33,7 @@ impl Material {
 
     pub fn lighting(
         &self,
-        object: &Shape,
+        object: &Box<Shape>,
         light: &PointLight,
         position: &Point,
         eye: &Vector,
@@ -84,7 +84,7 @@ mod tests {
     #[test]
     fn lighting_eye_between_light_and_surface() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn lighting_eye_between_light_and_surface_offset_45_deg() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn lighting_eye_opposite_surface_light_offset_45_deg() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn lighting_eye_path_of_reflection() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, -2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn lighting_behind_surface() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn lighting_with_surface_in_shadow() {
         let mat = Material::default();
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let position = Point::origin();
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn lighting_with_pattern_applied() {
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let mut mat = Material::default();
         mat.pattern = Some(Box::from(StripePattern::new(
             Color::white(),

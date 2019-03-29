@@ -7,7 +7,7 @@ pub trait Pattern: Send + Sync {
     fn set_transform(&mut self, t: Matrix4);
     fn color_at(&self, p: &Point) -> Color;
 
-    fn color_at_object(&self, s: &Shape, p: &Point) -> Color {
+    fn color_at_object(&self, s: &Box<Shape>, p: &Point) -> Color {
         let object_point = s.transform().inverse() * *p;
         let pattern_point = self.transform().inverse() * object_point;
         self.color_at(&pattern_point)
@@ -225,7 +225,7 @@ mod tests {
 
         #[test]
         fn stripe_with_object_transformation() {
-            let mut s = Sphere::new();
+            let mut s: Box<Shape> = Box::from(Sphere::new());
             s.set_transform(Matrix4::scaling(2.2, 2.2, 2.2));
             let p = StripePattern::new(Color::white(), Color::black());
             let c = p.color_at_object(&s, &Point::new(1.5, 0.0, 0.0));
@@ -234,7 +234,7 @@ mod tests {
 
         #[test]
         fn stripe_with_pattern_transformation() {
-            let s = Sphere::new();
+            let s: Box<Shape> = Box::from(Sphere::new());
             let mut p = StripePattern::new(Color::white(), Color::black());
             p.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
             let c = p.color_at_object(&s, &Point::new(1.5, 0.0, 0.0));
@@ -243,7 +243,7 @@ mod tests {
 
         #[test]
         fn stripe_with_both_object_and_pattern_transformation() {
-            let mut s = Sphere::new();
+            let mut s: Box<Shape> = Box::from(Sphere::new());
             s.set_transform(Matrix4::scaling(2.2, 2.2, 2.2));
             let mut p = StripePattern::new(Color::white(), Color::black());
             p.set_transform(Matrix4::translation(0.5, 0.0, 0.0));

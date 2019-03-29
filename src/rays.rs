@@ -23,7 +23,7 @@ impl Ray {
 #[derive(Clone, Copy)]
 pub struct Intersection<'a> {
     pub t: f32,
-    pub object: &'a Shape,
+    pub object: &'a Box<Shape>,
 }
 
 impl<'a> std::cmp::PartialEq for Intersection<'a> {
@@ -34,7 +34,7 @@ impl<'a> std::cmp::PartialEq for Intersection<'a> {
 
 pub struct Precomputation<'a> {
     pub t: f32,
-    pub object: &'a Shape,
+    pub object: &'a Box<Shape>,
     pub point: Point,
     pub over_point: Point,
     pub under_point: Point,
@@ -88,7 +88,7 @@ impl<'a> Intersection<'a> {
         let mut n1: f32 = 0.0;
         let mut n2: f32 = 0.0;
 
-        let mut containers: Vec<&Shape> = vec![];
+        let mut containers: Vec<&Box<Shape>> = vec![];
         for i in is {
             if i == self {
                 n1 = if containers.is_empty() {
@@ -132,6 +132,7 @@ impl<'a> Intersection<'a> {
 mod tests {
     use super::*;
     use crate::shapes::{Plane, Sphere};
+    use crate::materials::Material;
 
     #[test]
     fn initialize() {
@@ -156,7 +157,7 @@ mod tests {
 
     #[test]
     fn intersection_hits() {
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let mut i1 = Intersection { t: 1.0, object: &s };
         let mut i2 = Intersection { t: 2.0, object: &s };
         assert_eq!(Intersection::hit(&vec!(i1, i2)).unwrap().t, 1.0);
@@ -193,7 +194,7 @@ mod tests {
     #[test]
     fn hit_when_intersection_occurs_on_outside() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let i = Intersection { t: 4.0, object: &s };
         let is = [i];
         let c = i.precompute(&r, &is);
@@ -203,7 +204,7 @@ mod tests {
     #[test]
     fn hit_when_intersection_occurs_on_inside() {
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let i = Intersection { t: 1.0, object: &s };
         let mut is = [i];
         let c = i.precompute(&r, &mut is);
@@ -216,7 +217,7 @@ mod tests {
     #[test]
     fn precomputing_state_intersection() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let s = Sphere::new();
+        let s: Box<Shape> = Box::from(Sphere::new());
         let i = Intersection { t: 4.0, object: &s };
         let mut is = [i];
         let c = i.precompute(&r, &mut is);
@@ -228,7 +229,7 @@ mod tests {
 
     #[test]
     fn precomputing_reflect_vector() {
-        let s = Plane::new();
+        let s: Box<Shape> = Box::from(Plane::new());
         let r = Ray::new(
             Point::new(0.0, 1.0, -1.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
@@ -265,17 +266,17 @@ mod tests {
 
     #[test]
     fn finding_n1_and_n2_at_various_intersection() {
-        let mut a = Sphere::glass();
+        let mut a: Box<Shape> = Box::from(Sphere::glass());
         a.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
-        a.material.refractive_index = 1.5;
+        a.set_material(Material { refractive_index: 1.5, ..Material::default() });
 
-        let mut b = Sphere::glass();
+        let mut b: Box<Shape> = Box::from(Sphere::glass());
         b.set_transform(Matrix4::translation(0.0, 0.0, -0.25));
-        b.material.refractive_index = 2.0;
+        b.set_material(Material { refractive_index: 2.0, ..Material::default() });
 
-        let mut c = Sphere::glass();
+        let mut c: Box<Shape> = Box::from(Sphere::glass());
         c.set_transform(Matrix4::translation(0.0, 0.0, 0.25));
-        c.material.refractive_index = 2.5;
+        c.set_material(Material { refractive_index: 2.5, ..Material::default() });
 
         let r = Ray::new(Point::new(0.0, 0.0, -4.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
@@ -320,7 +321,7 @@ mod tests {
     #[test]
     fn under_point_is_offset_below_the_surface() {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let mut shape = Sphere::glass();
+        let mut shape: Box<Shape> = Box::from(Sphere::glass());
         shape.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
         let i = Intersection {
             t: 5.0,
@@ -334,7 +335,7 @@ mod tests {
 
     #[test]
     fn schlick_approximation_under_total_internal_reflection() {
-        let shape = Sphere::glass();
+        let shape: Box<Shape> = Box::from(Sphere::glass());
         let r = Ray::new(
             Point::new(0.0, 0.0, 2_f32.sqrt() / 2.0),
             Vector::new(0.0, 1.0, 0.0),
@@ -356,7 +357,7 @@ mod tests {
 
     #[test]
     fn schlick_approximation_with_a_perpendicular_viewing_angle() {
-        let shape = Sphere::glass();
+        let shape: Box<Shape> = Box::from(Sphere::glass());
         let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
         let is = vec![
             Intersection {
@@ -375,7 +376,7 @@ mod tests {
 
     #[test]
     fn schlick_approximation_with_small_angle_and_n2_greater_than_n1() {
-        let shape = Sphere::glass();
+        let shape: Box<Shape> = Box::from(Sphere::glass());
         let r = Ray::new(Point::new(0.0, 0.99, -2.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![Intersection {
             t: 1.8589,
