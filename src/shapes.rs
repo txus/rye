@@ -1,3 +1,4 @@
+use indextree::NodeId;
 use crate::linear::{Matrix, Matrix4, Point, Vector, EPSILON};
 use crate::materials::Material;
 use crate::rays::{Intersection, Ray};
@@ -13,6 +14,8 @@ fn gen_id() -> i32 {
 
 pub trait Shape: Send + Sync {
     fn id(&self) -> i32;
+    fn set_tag(&mut self, id: NodeId);
+    fn tag(&self) -> Option<NodeId>;
     fn casts_shadows(&self) -> bool;
     fn transform(&self) -> &Matrix4;
     fn inverse_transform(&self) -> &Matrix4;
@@ -42,6 +45,7 @@ impl std::cmp::PartialEq for Shape {
 
 pub struct Sphere {
     pub id: i32,
+    pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Material,
     pub casts_shadows: bool,
@@ -52,6 +56,7 @@ impl Sphere {
     pub fn new() -> Self {
         Sphere {
             id: gen_id(),
+            tag: None,
             material: Material::default(),
             transform: Matrix4::id(),
             casts_shadows: true,
@@ -62,6 +67,7 @@ impl Sphere {
     pub fn glass() -> Self {
         Sphere {
             id: gen_id(),
+            tag: None,
             material: Material {
                 transparency: 1.0,
                 refractive_index: 1.5,
@@ -77,6 +83,12 @@ impl Sphere {
 impl Shape for Sphere {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -133,6 +145,7 @@ impl Shape for Sphere {
 
 pub struct Plane {
     pub id: i32,
+    pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Material,
     pub casts_shadows: bool,
@@ -143,6 +156,7 @@ impl Plane {
     pub fn new() -> Plane {
         Plane {
             id: gen_id(),
+            tag: None,
             transform: Matrix4::id(),
             material: Material::default(),
             casts_shadows: true,
@@ -154,6 +168,12 @@ impl Plane {
 impl Shape for Plane {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -190,6 +210,7 @@ impl Shape for Plane {
 
 pub struct Cube {
     pub id: i32,
+    pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Material,
     pub casts_shadows: bool,
@@ -200,6 +221,7 @@ impl Cube {
     pub fn new() -> Cube {
         Cube {
             id: gen_id(),
+            tag: None,
             transform: Matrix4::id(),
             material: Material::default(),
             casts_shadows: true,
@@ -228,6 +250,12 @@ fn check_axis(origin: f32, direction: f32) -> (f32, f32) {
 impl Shape for Cube {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -287,6 +315,7 @@ impl Shape for Cube {
 
 pub struct Cylinder {
     pub id: i32,
+    pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Material,
     pub casts_shadows: bool,
@@ -300,6 +329,7 @@ impl Cylinder {
     pub fn new() -> Cylinder {
         Cylinder {
             id: gen_id(),
+            tag: None,
             transform: Matrix4::id(),
             material: Material::default(),
             casts_shadows: true,
@@ -357,6 +387,12 @@ impl Cylinder {
 impl Shape for Cylinder {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -431,6 +467,7 @@ impl Shape for Cylinder {
 
 pub struct Cone {
     pub id: i32,
+    pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Material,
     pub casts_shadows: bool,
@@ -444,6 +481,7 @@ impl Cone {
     pub fn new() -> Cone {
         Cone {
             id: gen_id(),
+            tag: None,
             transform: Matrix4::id(),
             material: Material::default(),
             casts_shadows: true,
@@ -477,6 +515,12 @@ impl Cone {
 impl Shape for Cone {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
     }
     fn casts_shadows(&self) -> bool {
         self.casts_shadows
@@ -577,6 +621,66 @@ impl Shape for Cone {
     }
 }
 
+pub struct Group {
+    pub id: i32,
+    pub tag: Option<NodeId>,
+    pub transform: Matrix4,
+    pub material: Material,
+    pub casts_shadows: bool,
+    inverse_transform: Matrix4,
+}
+
+impl Group {
+    pub fn new() -> Group {
+        let transform = Matrix4::id();
+        Group {
+            id: gen_id(),
+            tag: None,
+            transform: transform,
+            inverse_transform: transform.inverse(),
+            material: Material::default(),
+            casts_shadows: true
+        }
+    }
+}
+
+impl Shape for Group {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> Option<NodeId> {
+        self.tag
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = m
+    }
+    fn material(&self) -> &Material {
+        &self.material
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, p: &Point) -> Vector {
+        Vector::new(0.0, 0.0, 0.0)
+    }
+    fn local_intersect<'a>(&'a self, ray: &Ray) -> Vec<Intersection<'a>> {
+        vec![]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +707,11 @@ mod tests {
     impl Shape for TestShape {
         fn id(&self) -> i32 {
             0
+        }
+        fn set_tag(&mut self, id: NodeId) {
+        }
+        fn tag(&self) -> Option<NodeId> {
+            None
         }
         fn casts_shadows(&self) -> bool {
             true

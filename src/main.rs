@@ -2,7 +2,7 @@ extern crate yaml_rust;
 extern crate structopt;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 mod camera;
 mod canvas;
@@ -16,6 +16,7 @@ mod rays;
 mod shapes;
 mod world;
 mod parser;
+mod registry;
 
 /// A rye (tracer)
 #[derive(StructOpt, Debug)]
