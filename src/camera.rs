@@ -2,7 +2,6 @@ use crate::canvas::{Canvas, DynamicCanvas};
 use crate::linear::{Matrix, Matrix4, Point, Vector};
 use crate::rays::Ray;
 use crate::world::{World, MAX_REFLECTIONS};
-use crate::registry::Registry;
 
 pub struct Camera {
     hsize: u32,

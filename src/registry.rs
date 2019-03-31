@@ -1,8 +1,13 @@
 use indextree::{Arena, NodeId};
 use crate::shapes::Shape;
+use std::num::NonZeroUsize;
 
 pub struct Registry {
     arena: Arena<Box<Shape>>
+}
+
+pub fn id() -> NodeId {
+    NodeId::from_non_zero_usize(NonZeroUsize::new(1).unwrap())
 }
 
 impl Registry {
@@ -19,9 +24,8 @@ impl Registry {
         node_id
     }
 
-    pub fn get(&self, id: NodeId) -> Option<&Box<Shape>> {
-        let node = self.arena.get(id)?;
-        Some(&node.data)
+    pub fn get<'a>(&self, id: NodeId) -> &Box<Shape> {
+        &self.arena.get(id).expect("can't find node in registry").data
     }
 
     pub fn add(&mut self, group_id: NodeId, child_id: NodeId) {
@@ -30,23 +34,36 @@ impl Registry {
 
     pub fn parent(&self, child_id: NodeId) -> Option<&Box<Shape>> {
         let mut ancestors = child_id.ancestors(&self.arena);
-        ancestors.next().unwrap(); // skip self
+        ancestors.next().unwrap(); //skip self
         let parent_id = ancestors.next()?;
         let parent = self.arena.get(parent_id)?;
         Some(&parent.data)
     }
 
     pub fn children(&self, group_id: NodeId) -> Vec<&Box<Shape>> {
-        group_id.children(&self.arena).map(|x| &self.arena.get(x).unwrap().data).collect()
+        let ids = group_id.children(&self.arena);
+        let mut shapes = vec![];
+        for id in ids {
+            shapes.push(&self.arena.get(id).unwrap().data);
+        }
+        shapes
     }
 
     pub fn all(&self) -> Vec<&Box<Shape>> {
         self.arena.iter().map(|x| &x.data).collect()
     }
 
-    pub fn get_mut(&mut self, id: NodeId) -> Option<&mut Box<Shape>> {
-        let node = self.arena.get_mut(id)?;
-        Some(&mut node.data)
+    pub fn all_ids(&self) -> Vec<NodeId> {
+        let count = self.arena.count();
+        let mut out: Vec<NodeId> = vec![];
+        for i in 1..count { // 1-based indexing (dont ask)
+            out.push(NodeId::from_non_zero_usize(NonZeroUsize::new(i).unwrap()))
+        }
+        out
+    }
+
+    pub fn get_mut(&mut self, id: NodeId) -> &mut Box<Shape> {
+        &mut self.arena.get_mut(id).expect("can't find node by id").data
     }
 }
 
@@ -86,7 +103,7 @@ mod tests {
         let child_id = reg.register(s);
         let group_id = reg.register(g);
         reg.add(group_id, child_id);
-        let parent = reg.get(group_id).unwrap();
+        let parent = reg.get(group_id);
         assert_eq!(reg.children(group_id).first().unwrap().id(), sphere_id);
     }
 }

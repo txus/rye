@@ -3,7 +3,7 @@ use std::fs;
 use indextree::NodeId;
 use crate::light::PointLight;
 use crate::world::World;
-use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group};
+use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group, precompute_bounds};
 use crate::linear::{Point, Vector, Matrix4, Matrix};
 use crate::materials::Material;
 use crate::patterns::{Pattern, StripePattern, GradientPattern, RingPattern, CheckerPattern};
@@ -11,6 +11,9 @@ use crate::color::Color;
 use crate::camera::{Camera, view_transform};
 use crate::registry::Registry;
 use crate::obj_parser;
+
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct ParseError(String);
@@ -110,7 +113,7 @@ fn parse_transform(doc: &Yaml) -> (Matrix4, Matrix4, Matrix4) {
     (translation, rotation, scale)
 }
 
-fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<NodeId, Error> {
+fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, Error> {
     let (translation, rotation, scale) = parse_transform(&doc);
     let transform = translation * scale * rotation;
     let material = parse_material(&doc["material"]);
@@ -121,24 +124,30 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<NodeId, Error> {
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             c.casts_shadows = casts_shadows;
-            let id = reg.register(Box::from(c));
-            Ok(id)
+            Ok({
+                let mut reg = registry.borrow_mut();
+                reg.register(Box::from(c))
+            })
         },
         Some("Sphere") => {
             let mut s = Sphere::new();
             s.set_transform(transform);
             if let Ok(m) = material { s.set_material(m) }
             s.casts_shadows = casts_shadows;
-            let id = reg.register(Box::from(s));
-            Ok(id)
+            Ok({
+                let mut reg = registry.borrow_mut();
+                reg.register(Box::from(s))
+            })
         },
         Some("Plane") => {
             let mut p = Plane::new();
             p.set_transform(transform);
             if let Ok(m) = material { p.set_material(m) }
             p.casts_shadows = casts_shadows;
-            let id = reg.register(Box::from(p));
-            Ok(id)
+            Ok({
+                let mut reg = registry.borrow_mut();
+                reg.register(Box::from(p))
+            })
         },
         Some("Cylinder") => {
             let mut c = Cylinder::new();
@@ -159,8 +168,10 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<NodeId, Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            let id = reg.register(Box::from(c));
-            Ok(id)
+            Ok({
+                let mut reg = registry.borrow_mut();
+                reg.register(Box::from(c))
+            })
         },
         Some("Cone") => {
             let mut c = Cone::new();
@@ -181,35 +192,78 @@ fn parse_object(reg: &mut Registry, doc: &Yaml) -> Result<NodeId, Error> {
             };
             c.closed = closed;
             c.casts_shadows = casts_shadows;
-            let id = reg.register(Box::from(c));
-            Ok(id)
+            Ok({
+                let mut reg = registry.borrow_mut();
+                reg.register(Box::from(c))
+            })
         },
         Some("Group") => {
-            let mut g = Box::from(Group::new());
-            g.set_transform(transform);
-            if let Ok(m) = material { g.set_material(m) }
-            let gid = reg.register(g);
+            let gid = {
+                let gid = {
+                    let mut reg = registry.borrow_mut();
+                    let mut g = Box::from(Group::new());
+                    g.set_transform(transform);
+                    if let Ok(m) = material { g.set_material(m) }
+                    reg.register(g)
+                };
 
-            let obj_array = match &doc["children"] {
-                Yaml::Array(a) => Ok(a),
-                _ => Err(Error::Parse("'children' is not an array".to_owned()))
-            }?;
+                let obj_array = match &doc["children"] {
+                    Yaml::Array(a) => Ok(a),
+                    _ => Err(Error::Parse("'children' is not an array".to_owned()))
+                }?;
 
-            for o in obj_array.iter() {
-                let id = parse_object(reg, &o).unwrap();
-                reg.add(gid, id);
+                for o in obj_array.iter() {
+                    let id = parse_object(registry.clone(), &o).unwrap();
+                    let mut reg = registry.borrow_mut();
+                    reg.add(gid, id);
+                }
+                gid
+            };
+            let bounds = {
+                let reg = registry.borrow();
+                precompute_bounds(reg.children(gid))
+            };
+            {
+                let mut reg = registry.borrow_mut();
+                let g = reg.get_mut(gid);
+                g.set_bounds(bounds);
             }
-
             Ok(gid)
         },
         Some("Obj") => {
             let filename = doc["filename"].as_str().expect("no filename in OBJ clause");
-            let results = obj_parser::read_filename(reg, &filename).unwrap();
-            let id = results.root;
-            let g = reg.get_mut(id).unwrap();
-            g.set_transform(transform);
-            if let Ok(m) = material { g.set_material(m) }
-            Ok(id)
+            let results = {
+                let mut reg = registry.borrow_mut();
+                let results = obj_parser::read_filename(&mut reg, &filename).expect("can't parse OBJ file");
+                let root_group_id = results.root;
+                let g = reg.get_mut(root_group_id);
+                g.set_transform(transform);
+                if let Ok(m) = material { g.set_material(m) }
+                results
+            };
+
+            for group_id in results.group_ids {
+                let bounds = {
+                    let reg = registry.borrow();
+                    precompute_bounds(reg.children(group_id))
+                };
+                {
+                    let mut reg = registry.borrow_mut();
+                    let group = reg.get_mut(group_id);
+                    group.set_bounds(bounds);
+                }
+            }
+
+            let root_group_bounds = {
+                let reg = registry.borrow();
+                precompute_bounds(reg.children(results.root))
+            };
+            {
+                let mut reg = registry.borrow_mut();
+                let g = reg.get_mut(results.root);
+                g.set_bounds(root_group_bounds);
+            }
+            Ok(results.root)
         }
         _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone, Group, Obj"))
     }
@@ -227,7 +281,7 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
     }?;
 
     for o in obj_array.iter() {
-        parse_object(&mut w.registry, &o).unwrap();
+        parse_object(w.registry.clone(), &o).unwrap();
     }
 
     w.light_source = light;
@@ -296,6 +350,6 @@ objects:
         let (world, _camera_at, _camera_look_at, _camera_up, _camera_fov) = read_string(&s).unwrap();
         assert_eq!(world.light_source.position, Point::new(1.0, 6.0, 5.0));
         assert_eq!(world.light_source.intensity, Color::white());
-        assert_eq!(world.registry.all().len(), 5);
+        assert_eq!(world.registry.borrow().all().len(), 5);
     }
 }

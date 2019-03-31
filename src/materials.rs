@@ -57,7 +57,7 @@ impl Material {
         in_shadow: bool,
     ) -> Color {
         let color = if let Some(pattern) = &self.pattern {
-            pattern.color_at_object(object, &position)
+            pattern.color_at_object(&object, &position)
         } else {
             self.color
         };

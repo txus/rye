@@ -13,10 +13,10 @@ pub enum Error {
 
 pub struct ParseResult {
     pub ignored_count: usize,
-    pub groups_count: usize,
     pub triangles_count: usize,
     pub vertices: Vec<Point>,
     pub root: NodeId,
+    pub group_ids: Vec<NodeId>,
 }
 
 fn fan_triangulation(faces: &[(Point, Option<Point>, Option<Vector>)]) -> Vec<Box<Shape>> {
@@ -38,8 +38,8 @@ fn fan_triangulation(faces: &[(Point, Option<Point>, Option<Vector>)]) -> Vec<Bo
 
 pub fn read_string(reg: &mut Registry, s: &str) -> Result<ParseResult, Error> {
     let mut ignored_count: usize = 0;
-    let mut groups_count: usize = 1;
     let mut triangles_count: usize = 0;
+    let mut group_ids: Vec<NodeId> = vec![];
     let mut vertices: Vec<Point> = vec![];
     let mut normals: Vec<Vector> = vec![];
 
@@ -86,7 +86,7 @@ pub fn read_string(reg: &mut Registry, s: &str) -> Result<ParseResult, Error> {
                 let gid = reg.register(group);
                 reg.add(root, gid);
                 current_group = gid;
-                groups_count += 1;
+                group_ids.push(gid);
             },
             _ => {
                 ignored_count += 1;
@@ -96,7 +96,7 @@ pub fn read_string(reg: &mut Registry, s: &str) -> Result<ParseResult, Error> {
 
     Ok(ParseResult {
         ignored_count,
-        groups_count,
+        group_ids,
         triangles_count,
         vertices,
         root,
@@ -113,9 +113,6 @@ pub fn read_filename(reg: &mut Registry, filename: &str) -> Result<ParseResult, 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::cell::RefCell;
-    use std::rc::Rc;
 
     #[test]
     fn ignoring_unrecognized_lines() {
@@ -142,12 +139,8 @@ v 1 1 0");
 
     #[test]
     fn triangle_faces() {
-        let registry = Rc::new(RefCell::new(Registry::new()));
-        let id;
-        {
-            let mut reg = registry.borrow_mut();
-
-            let s = String::from("
+        let mut registry = Registry::new();
+        let s = String::from("
 v -1 1 0
 v -1 0 0
 v 1 0 0
@@ -155,46 +148,32 @@ v 1 1 0
 
 f 1 2 3
 f 1 3 4");
-            let result = read_string(&mut reg, &s).unwrap();
-            id = result.root;
-        }
-
-        let reg = registry.borrow();
-        let children = reg.children(id);
+        let result = read_string(&mut registry, &s).unwrap();
+        let id = result.root;
+        let children = registry.children(id);
         assert_eq!(children.len(), 2);
     }
 
     #[test]
     fn triangulating_polygons() {
-        let registry = Rc::new(RefCell::new(Registry::new()));
-        let id;
-        {
-            let mut reg = registry.borrow_mut();
-
-            let s = String::from("
+        let mut registry = Registry::new();
+        let s = String::from("
 v -1 1 0
 v -1 0 0
 v 1 0 0
 v 1 1 0
 v 0 2 0
 f 1 2 3 4 5");
-            let result = read_string(&mut reg, &s).unwrap();
-            id = result.root;
-        }
-
-        let reg = registry.borrow();
-        let children = reg.children(id);
+        let result = read_string(&mut registry, &s).unwrap();
+        let id = result.root;
+        let children = registry.children(id);
         assert_eq!(children.len(), 3);
     }
 
     #[test]
     fn triangles_in_groups() {
-        let registry = Rc::new(RefCell::new(Registry::new()));
-        let id;
-        {
-            let mut reg = registry.borrow_mut();
-
-            let s = String::from("
+        let mut registry = Registry::new();
+        let s = String::from("
 v -1 1 0
 v -1 0 0
 v 1 0 0
@@ -203,25 +182,18 @@ g FirstGroup
 f 1 2 3
 g SecondGroup
 f 1 3 4");
-            let result = read_string(&mut reg, &s).unwrap();
-            assert_eq!(result.groups_count, 3);
-            assert_eq!(result.triangles_count, 2);
-            id = result.root;
-        }
-
-        let reg = registry.borrow();
-        let children = reg.children(id);
+        let result = read_string(&mut registry, &s).unwrap();
+        assert_eq!(result.group_ids.len(), 2);
+        assert_eq!(result.triangles_count, 2);
+        let id = result.root;
+        let children = registry.children(id);
         assert_eq!(children.len(), 2); // groups
     }
 
     #[test]
     fn vertex_normal_data() {
-        let registry = Rc::new(RefCell::new(Registry::new()));
-        let id;
-        {
-            let mut reg = registry.borrow_mut();
-
-            let s = String::from("
+        let mut registry = Registry::new();
+        let s = String::from("
 v 0 1 0
 v -1 0 0
 v 1 0 0
@@ -230,11 +202,9 @@ vn 1 0 0
 vn 0 1 0
 f 1//3 2//1 3//2
 f 1/0/3 2/102/1 3/14/2");
-            let result = read_string(&mut reg, &s).unwrap();
-            id = result.root;
-        }
-        let reg = registry.borrow();
-        let children = reg.children(id);
+        let result = read_string(&mut registry, &s).unwrap();
+        let id = result.root;
+        let children = registry.children(id);
         assert_eq!(children.len(), 2);
     }
 }

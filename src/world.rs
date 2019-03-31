@@ -6,10 +6,13 @@ use crate::rays::{Intersection, Precomputation, Ray};
 use crate::shapes::{Shape, Sphere};
 use crate::registry::Registry;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub const MAX_REFLECTIONS: usize = 4;
 
 pub struct World {
-    pub registry: Registry,
+    pub registry: Rc<RefCell<Registry>>,
     pub light_source: PointLight,
 }
 
@@ -33,14 +36,17 @@ impl World {
 
     pub fn default() -> Self {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut reg = Registry::new();
-        let s1: Box<Shape> = Box::from(Self::default_sphere1());
-        let s2: Box<Shape> = Box::from(Self::default_sphere2());
-        reg.register(s1);
-        reg.register(s2);
+        let registry = Rc::new(RefCell::new(Registry::new()));
+        {
+            let mut reg = registry.borrow_mut();
+            let s1: Box<Shape> = Box::from(Self::default_sphere1());
+            let s2: Box<Shape> = Box::from(Self::default_sphere2());
+            reg.register(s1);
+            reg.register(s2);
+        }
 
         World {
-            registry: reg,
+            registry: registry,
             light_source: light,
         }
     }
@@ -48,24 +54,34 @@ impl World {
     pub fn empty() -> Self {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
         World {
-            registry: Registry::new(),
+            registry: Rc::new(RefCell::new(Registry::new())),
             light_source: light,
         }
     }
 
-    pub fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
+    pub fn intersect<'a>(&'a self, ray: &Ray) -> Vec<Intersection> {
         let mut out: Vec<Intersection> = vec![];
-        for object in &self.registry.all() {
-            out.append(&mut object.intersect(&self.registry, &ray))
+        {
+            let reg = self.registry.borrow();
+            let ids = reg.all_ids();
+
+            for id in ids {
+                let object = reg.get(id.clone());
+                for i in object.intersect(&reg, &ray) {
+                    out.push(i);
+                }
+            }
         }
         out.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
         out
     }
 
     pub fn shade(&self, c: &Precomputation, remaining: usize) -> Color {
-        let material = c.object.material(&self.registry);
+        let reg = self.registry.borrow();
+        let object = reg.get(c.object);
+        let material = object.material(&reg);
         let surface = material.lighting(
-            c.object,
+            &object,
             &self.light_source,
             &c.over_point,
             &c.eye,
@@ -85,15 +101,19 @@ impl World {
 
     pub fn color_at(&self, r: &Ray, remaining: usize) -> Color {
         let intersections = self.intersect(&r);
-        if let Some(hit) = Intersection::hit(&intersections) {
-            self.shade(&hit.precompute(&self.registry, &r, &intersections), remaining)
+        let maybe_hit = Intersection::hit(&intersections);
+        let reg = self.registry.borrow();
+        if let Some(hit) = maybe_hit {
+            self.shade(&hit.precompute(&reg, &r, &intersections), remaining)
         } else {
             Color::black()
         }
     }
 
     pub fn reflected_color(&self, comps: &Precomputation, remaining: usize) -> Color {
-        let mat = comps.object.material(&self.registry);
+        let reg = self.registry.borrow();
+        let object = reg.get(comps.object);
+        let mat = object.material(&reg);
         if remaining <= 0 || mat.reflective == 0.0 {
             Color::black()
         } else {
@@ -104,7 +124,9 @@ impl World {
     }
 
     pub fn refracted_color(&self, comps: &Precomputation, remaining: usize) -> Color {
-        let mat = comps.object.material(&self.registry);
+        let reg = self.registry.borrow();
+        let object = reg.get(comps.object);
+        let mat = object.material(&reg);
         if remaining == 0 || mat.transparency == 0.0 {
             Color::black()
         } else {
@@ -129,10 +151,15 @@ impl World {
         let direction = v.normalize();
 
         let r = Ray::new(*p, direction);
-        let mut intersections = self.intersect(&r);
+        let intersections = self.intersect(&r);
+        let maybe_hit = Intersection::hit(&intersections);
 
-        match Intersection::hit(&mut intersections) {
-            Some(h) if h.t < distance && h.object.casts_shadows() => true,
+        match maybe_hit {
+            Some(h) if h.t < distance => {
+                let reg = self.registry.borrow();
+                let object = reg.get(h.object);
+                object.casts_shadows()
+            },
             _ => false,
         }
     }
@@ -146,6 +173,7 @@ mod tests {
     use crate::linear::{Matrix4, Point, Vector, EPSILON};
     use crate::materials::Material;
     use crate::shapes::Plane;
+    use crate::registry::id;
 
     #[test]
     fn default_world() {
@@ -182,8 +210,8 @@ mod tests {
             id = reg.register(Box::from(Sphere::new()));
         }
         let reg = registry.borrow();
-        let s = reg.get(id).unwrap();
-        let i = Intersection { uv: None, t: 4.0, object: s };
+        let s = reg.get(id);
+        let i = Intersection { uv: None, t: 4.0, object: id };
         let is = [i];
         let comps = i.precompute(&reg, &r, &is);
         assert_eq!(comps.point, Point::new(0.0, 0.0, -1.0));
@@ -195,13 +223,13 @@ mod tests {
     fn shading_intersection() {
         let w = World::default();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let shape: &Box<Shape> = w.registry.all().first().unwrap();
+        let reg = w.registry.borrow();
         let i = Intersection { uv: None,
             t: 4.0,
-            object: shape,
+            object: id(),
         };
         let is = [i];
-        let comps = i.precompute(&w.registry, &r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert_eq!(w.shade(&comps, 1), Color::new(0.38066, 0.47583, 0.2855));
     }
 
@@ -210,13 +238,13 @@ mod tests {
         let mut w = World::default();
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::white());
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
-        let shape: &Box<Shape> = w.registry.all().last().unwrap();
+        let reg = w.registry.borrow();
         let i = Intersection { uv: None,
             t: 0.5,
-            object: shape,
+            object: id(),
         };
         let is = [i];
-        let comps = i.precompute(&w.registry, &r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         assert_eq!(w.shade(&comps, 1), Color::new(0.90498, 0.90498, 0.90498));
     }
 
@@ -272,13 +300,13 @@ mod tests {
         {
             let mut reg = registry.borrow_mut();
             id = reg.register(Box::from(Sphere::new()));
-            let s = reg.get_mut(id).unwrap();
+            let s = reg.get_mut(id);
             s.set_transform(Matrix4::translation(0.0, 0.0, 1.0));
         }
 
         let reg = registry.borrow();
-        let s = reg.get(id).unwrap();
-        let i = Intersection { uv: None, t: 5.0, object: s };
+        let s = reg.get(id);
+        let i = Intersection { uv: None, t: 5.0, object: id };
         let mut is = [i];
         let comps = i.precompute(&reg, &r, &mut is);
         assert!(comps.over_point.z < -EPSILON / 2.0);
