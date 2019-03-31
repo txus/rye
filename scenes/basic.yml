@@ -93,17 +93,16 @@ objects:
         shininess: 50
         specular: 1
         reflective: 0.3
-    - shape: Cube
-      at: [-0.5, 0.6, -0.8]
-      rotate: [0, 40, 0]
-      scale: [0.6, 0.6, 0.6]
-      casts_shadows: false
-      material:
-        color: [0, 0.4, 0.1]
-        specular: 1
-        shininess: 400
-        diffuse: 0.3
-        ambient: 0.1
-        reflective: 1
-        transparency: 1
-        refractive_index: 0.3
+    - shape: CSG
+      at: [0, 1, -1]
+      rotate: [0, 60, 0]
+      operation: Intersection
+      left:
+        shape: Sphere
+        material:
+          color: [1, 0, 0]
+      right:
+        shape: Sphere
+        at: [0.5, 0.5, 0.5]
+        material:
+          color: [0, 1, 0]

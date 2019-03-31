@@ -25,6 +25,20 @@ fn search_material(reg: &Registry, id: NodeId) -> &Material {
 pub struct Bounds(Point, Point);
 
 impl Bounds {
+    fn infinite() -> Bounds {
+        Bounds(
+            Point::new(-INFINITY, -INFINITY, -INFINITY),
+            Point::new(INFINITY, INFINITY, INFINITY),
+        )
+    }
+
+    fn empty() -> Bounds {
+        Bounds(
+            Point::new(INFINITY, INFINITY, INFINITY),
+            Point::new(-INFINITY, -INFINITY, -INFINITY),
+        )
+    }
+
     fn union(&self, other: &Bounds) -> Bounds {
         Bounds(
             Point::new(
@@ -51,10 +65,7 @@ impl Bounds {
             Point::new(self.1.x, self.1.y, self.0.z),
             self.1,
         ];
-        let mut out = Bounds(
-            Point::new(INFINITY, INFINITY, INFINITY),
-            Point::new(-INFINITY, -INFINITY, -INFINITY)
-        );
+        let mut out = Bounds::empty();
         for v in vertices {
             let p = *t * v;
             out = out.union(&Bounds(p, p));
@@ -290,10 +301,7 @@ impl Plane {
             transform: Matrix4::id(),
             material: None,
             casts_shadows: true,
-            bounds: Bounds(
-            Point::new(-INFINITY, -INFINITY, -INFINITY),
-            Point::new(INFINITY, INFINITY, INFINITY)
-            ),
+            bounds: Bounds::infinite(),
             inverse_transform: Matrix4::id().inverse(),
         }
     }
@@ -829,19 +837,13 @@ impl Group {
             inverse_transform: transform.inverse(),
             material: None,
             casts_shadows: true,
-            bounds: Bounds(
-                Point::new(-INFINITY, -INFINITY, -INFINITY),
-                Point::new(INFINITY, INFINITY, INFINITY),
-                )
+            bounds: Bounds::infinite()
         }
     }
 }
 
 pub fn precompute_bounds(children: Vec<&Box<Shape>>) -> Bounds {
-    let mut bounds = Bounds(
-            Point::new(INFINITY, INFINITY, INFINITY),
-            Point::new(-INFINITY, -INFINITY, -INFINITY),
-            );
+    let mut bounds = Bounds::empty();
     for child in children.iter() {
         bounds = bounds.union(&child.bounds().transform(&child.transform()));
     }
@@ -1140,6 +1142,126 @@ impl Shape for SmoothTriangle {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum CSGOperation {
+    Union,
+    Intersection,
+    Difference
+}
+
+pub struct CSG {
+    pub operation: CSGOperation,
+    pub left: NodeId,
+    pub right: NodeId,
+    tag: Option<NodeId>,
+    id: i32,
+    casts_shadows: bool,
+    transform: Matrix4,
+    pub bounds: Bounds,
+    inverse_transform: Matrix4,
+    material: Option<Material>,
+}
+
+impl CSG {
+    pub fn new(operation: CSGOperation, left: NodeId, right: NodeId) -> CSG {
+        CSG {
+            operation, left, right,
+            tag: None,
+            id: gen_id(),
+            casts_shadows: true,
+            transform: Matrix4::id(),
+            inverse_transform: Matrix4::id().inverse(),
+            bounds: Bounds::infinite(),
+            material: None,
+        }
+    }
+
+    fn intersection_allowed(&self, lhit: bool, inl: bool, inr: bool) -> bool {
+        match &self.operation {
+            CSGOperation::Union => (lhit && !inr) || (!lhit && !inl),
+            CSGOperation::Intersection => (lhit && inr) || (!lhit && inl),
+            CSGOperation::Difference => (lhit && !inr) || (!lhit && inl)
+        }
+    }
+
+    fn filter_intersections(&self, is: &[Intersection]) -> Vec<Intersection> {
+        let mut inl = false;
+        let mut inr = false;
+
+        let mut result: Vec<Intersection> = vec![];
+
+        for i in is {
+            let lhit = self.left == i.object;
+
+            if self.intersection_allowed(lhit, inl, inr) {
+                result.push(*i);
+            }
+
+            if lhit {
+                inl = !inl;
+            } else {
+                inr = !inr;
+            }
+        }
+
+        result
+    }
+}
+
+impl Shape for CSG {
+    fn id(&self) -> i32 {
+        self.id
+    }
+    fn bounds(&self) -> &Bounds {
+        &self.bounds
+    }
+    fn set_bounds(&mut self, bounds: Bounds) {
+        self.bounds = bounds;
+    }
+    fn set_tag(&mut self, id: NodeId) {
+        self.tag = Some(id);
+    }
+    fn tag(&self) -> NodeId {
+        self.tag.unwrap_or_else(|| panic!("Object without tag"))
+    }
+    fn casts_shadows(&self) -> bool {
+        self.casts_shadows
+    }
+    fn set_transform(&mut self, t: Matrix4) {
+        self.transform = t;
+        self.inverse_transform = t.inverse();
+    }
+    fn set_material(&mut self, m: Material) {
+        self.material = Some(m)
+    }
+    fn material<'a>(&'a self, reg: &'a Registry) -> &'a Material {
+        if let Some(mat) = &self.material {
+            &mat
+        } else {
+            search_material(reg, self.tag())
+        }
+    }
+    fn transform(&self) -> &Matrix4 {
+        &self.transform
+    }
+    fn inverse_transform(&self) -> &Matrix4 {
+        &self.inverse_transform
+    }
+    fn local_normal_at(&self, _p: &Point, _i: &Intersection) -> Vector {
+        Vector::new(0.0, 0.0, 0.0)
+    }
+    fn local_intersect<'a>(&'a self, reg: &'a Registry, ray: &Ray) -> Vec<Intersection> {
+        let left = reg.get(self.left);
+        let right = reg.get(self.right);
+        let mut leftxs = left.intersect(&reg, &ray);
+        let mut rightxs = right.intersect(&reg, &ray);
+
+        leftxs.append(&mut rightxs);
+        leftxs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
+
+        self.filter_intersections(&leftxs)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -2209,6 +2331,163 @@ mod tests {
             };
             let v = t.normal(&reg, Point::origin(), &i);
             assert_eq!(v, Vector::new(-0.5547, 0.83205, 0.0));
+        }
+    }
+
+    mod csg {
+        use super::*;
+
+        #[test]
+        fn creation() {
+            let mut reg = Registry::new();
+            let sphere = reg.register(Box::from(Sphere::new()));
+            let cube = reg.register(Box::from(Cube::new()));
+            let s = CSG::new(CSGOperation::Union, sphere, cube);
+            assert_eq!(s.operation, CSGOperation::Union);
+            assert_eq!(s.left, sphere);
+            assert_eq!(s.right, cube);
+        }
+
+        #[test]
+        fn union_intersection_allowed() {
+            let mut reg = Registry::new();
+            let sphere = reg.register(Box::from(Sphere::new()));
+            let cube = reg.register(Box::from(Cube::new()));
+            let s = CSG::new(CSGOperation::Union, sphere, cube);
+
+            let examples: Vec<(bool, bool, bool, bool)> = vec![
+                (true , true  , true  , false),
+                (true , true  , false , true),
+                (true , false , true  , false),
+                (true , false , false , true),
+                (false, true  , true  , false),
+                (false, true  , false , false),
+                (false, false , true  , true),
+                (false, false , false , true),
+            ];
+
+            for (lhit, inl, inr, result) in examples {
+                assert_eq!(s.intersection_allowed(lhit, inl, inr), result);
+            }
+        }
+
+        #[test]
+        fn intersect_intersection_allowed() {
+            let mut reg = Registry::new();
+            let sphere = reg.register(Box::from(Sphere::new()));
+            let cube = reg.register(Box::from(Cube::new()));
+            let s = CSG::new(CSGOperation::Intersection, sphere, cube);
+
+            let examples: Vec<(bool, bool, bool, bool)> = vec![
+                (true , true  , true  , true),
+                (true , true  , false , false),
+                (true , false , true  , true),
+                (true , false , false , false),
+                (false, true  , true  , true),
+                (false, true  , false , true),
+                (false, false , true  , false),
+                (false, false , false , false),
+            ];
+
+            for (lhit, inl, inr, result) in examples {
+                assert_eq!(s.intersection_allowed(lhit, inl, inr), result);
+            }
+        }
+
+        #[test]
+        fn difference_intersection_allowed() {
+            let mut reg = Registry::new();
+            let sphere = reg.register(Box::from(Sphere::new()));
+            let cube = reg.register(Box::from(Cube::new()));
+            let s = CSG::new(CSGOperation::Difference, sphere, cube);
+
+            let examples: Vec<(bool, bool, bool, bool)> = vec![
+                (true , true  , true  , false),
+                (true , true  , false , true),
+                (true , false , true  , false),
+                (true , false , false , true),
+                (false, true  , true  , true),
+                (false, true  , false , true),
+                (false, false , true  , false),
+                (false, false , false , false),
+            ];
+
+            for (lhit, inl, inr, result) in examples {
+                assert_eq!(s.intersection_allowed(lhit, inl, inr), result);
+            }
+        }
+
+        #[test]
+        fn filtering_intersections() {
+            let mut reg = Registry::new();
+            let sphere = reg.register(Box::from(Sphere::new()));
+            let cube = reg.register(Box::from(Cube::new()));
+            let u = CSG::new(CSGOperation::Union, sphere, cube);
+            let i = CSG::new(CSGOperation::Intersection, sphere, cube);
+            let d = CSG::new(CSGOperation::Difference, sphere, cube);
+
+            let is: Vec<Intersection> = vec![
+                Intersection { t: 1.0, uv: None, object: sphere },
+                Intersection { t: 2.0, uv: None, object: cube },
+                Intersection { t: 3.0, uv: None, object: sphere },
+                Intersection { t: 4.0, uv: None, object: cube },
+            ];
+
+            assert_eq!(
+                u.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                vec![1.0, 4.0]
+                );
+
+            assert_eq!(
+                i.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                vec![2.0, 3.0]
+                );
+
+            assert_eq!(
+                d.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                vec![1.0, 2.0]
+                );
+        }
+
+        #[test]
+        fn ray_misses_csg_object() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+
+            let (sphere, cube, csg) = { 
+                let mut reg = registry.borrow_mut();
+                let sphere = reg.register(Box::from(Sphere::new()));
+                let cube = reg.register(Box::from(Cube::new()));
+                let csg = reg.register(Box::from(CSG::new(CSGOperation::Union, sphere, cube)));
+                (sphere, cube, csg)
+            };
+
+            let reg = registry.borrow();
+            let c = reg.get(csg);
+            let r = Ray::new(Point::new(0.0, 2.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+            assert_eq!(c.local_intersect(&reg, &r), vec![])
+        }
+
+        #[test]
+        fn ray_hits_csg_object() {
+            let registry = Rc::new(RefCell::new(Registry::new()));
+
+            let (sphere, sphere2, csg) = { 
+                let mut reg = registry.borrow_mut();
+                let sphere = reg.register(Box::from(Sphere::new()));
+                let mut sphere2_obj = Box::from(Sphere::new());
+                sphere2_obj.set_transform(Matrix4::translation(0.0, 0.0, 0.5));
+                let sphere2 = reg.register(sphere2_obj);
+                let csg = reg.register(Box::from(CSG::new(CSGOperation::Union, sphere, sphere2)));
+                (sphere, sphere2, csg)
+            };
+
+            let reg = registry.borrow();
+            let c = reg.get(csg);
+            let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+            assert_eq!(c.local_intersect(&reg, &r), vec![
+                Intersection { uv: None, t: 4.0, object: sphere },
+                Intersection { uv: None, t: 6.5, object: sphere2 },
+            ])
         }
     }
 }

@@ -21,7 +21,7 @@ impl Ray {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Intersection {
     pub t: f32,
     pub uv: Option<(f32, f32)>,
@@ -56,7 +56,7 @@ impl Precomputation {
             cos = cos_t;
         }
         let r0 = ((self.n1 - self.n2) / (self.n1 + self.n2)).powi(2);
-        r0 + (1.0 - r0) * (1.0 - cos).powf(5.0)
+        r0 + (1.0 - r0) * (1.0 - cos).powi(5)
     }
 }
 

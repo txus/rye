@@ -3,7 +3,7 @@ use std::fs;
 use indextree::NodeId;
 use crate::light::PointLight;
 use crate::world::World;
-use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group, precompute_bounds};
+use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group, precompute_bounds, CSG, CSGOperation};
 use crate::linear::{Point, Vector, Matrix4, Matrix};
 use crate::materials::Material;
 use crate::patterns::{Pattern, StripePattern, GradientPattern, RingPattern, CheckerPattern};
@@ -197,6 +197,29 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
                 reg.register(Box::from(c))
             })
         },
+        Some("CSG") => {
+            let left = parse_object(registry.clone(), &doc["left"]).unwrap();
+            let right = parse_object(registry.clone(), &doc["right"]).unwrap();
+            let combined_bounds = {
+                let reg = registry.borrow();
+                let l = reg.get(left);
+                let r = reg.get(right);
+                precompute_bounds(vec![l, r])
+            };
+            let operation: CSGOperation = match &doc["operation"].as_str() {
+                Some("Union") => CSGOperation::Union,
+                Some("Intersection") => CSGOperation::Intersection,
+                Some("Difference") => CSGOperation::Difference,
+                _ => panic!("unknown CSG operation")
+            };
+            Ok({
+                let mut reg = registry.borrow_mut();
+                let mut csg = Box::from(CSG::new(operation, left, right));
+                csg.set_transform(transform);
+                csg.set_bounds(combined_bounds);
+                reg.register(csg)
+            })
+        },
         Some("Group") => {
             let gid = {
                 let gid = {
@@ -265,7 +288,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
             }
             Ok(results.root)
         }
-        _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone, Group, Obj"))
+        _ => Err(unknown("Shape", doc, "type", "Cube, Sphere, Plane, Cylinder, Cone, Group, Obj, CSG"))
     }
 }
 
