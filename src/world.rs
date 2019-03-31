@@ -41,8 +41,10 @@ impl World {
             let mut reg = registry.borrow_mut();
             let s1: Box<Shape> = Box::from(Self::default_sphere1());
             let s2: Box<Shape> = Box::from(Self::default_sphere2());
-            reg.register(s1);
-            reg.register(s2);
+            let id1 = reg.register(s1);
+            let id2 = reg.register(s2);
+            println!("first id: {:?}", id1);
+            println!("second id: {:?}", id2);
         }
 
         World {
@@ -242,7 +244,7 @@ mod tests {
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
         let i = Intersection { uv: None,
             t: 0.5,
-            object: id_from(1),
+            object: id_from(2),
         };
         let is = [i];
         let reg = w.registry.borrow();
