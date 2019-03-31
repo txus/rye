@@ -7,7 +7,10 @@ pub struct Registry {
 }
 
 pub fn id() -> NodeId {
-    NodeId::from_non_zero_usize(NonZeroUsize::new(1).unwrap())
+    id_from(1)
+}
+pub fn id_from(id: usize) -> NodeId {
+    NodeId::from_non_zero_usize(NonZeroUsize::new(id).unwrap())
 }
 
 impl Registry {
@@ -56,7 +59,7 @@ impl Registry {
     pub fn all_ids(&self) -> Vec<NodeId> {
         let count = self.arena.count();
         let mut out: Vec<NodeId> = vec![];
-        for i in 1..count { // 1-based indexing (dont ask)
+        for i in 1..=count { // 1-based indexing (dont ask)
             out.push(NodeId::from_non_zero_usize(NonZeroUsize::new(i).unwrap()))
         }
         out

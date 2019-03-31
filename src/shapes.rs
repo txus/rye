@@ -830,8 +830,8 @@ impl Group {
             material: None,
             casts_shadows: true,
             bounds: Bounds(
-                Point::new(INFINITY, INFINITY, INFINITY),
                 Point::new(-INFINITY, -INFINITY, -INFINITY),
+                Point::new(INFINITY, INFINITY, INFINITY),
                 )
         }
     }

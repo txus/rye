@@ -173,7 +173,10 @@ mod tests {
     use crate::linear::{Matrix4, Point, Vector, EPSILON};
     use crate::materials::Material;
     use crate::shapes::Plane;
-    use crate::registry::id;
+    use crate::registry::{id, id_from};
+    use crate::patterns::TestPattern;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn default_world() {
@@ -210,7 +213,6 @@ mod tests {
             id = reg.register(Box::from(Sphere::new()));
         }
         let reg = registry.borrow();
-        let s = reg.get(id);
         let i = Intersection { uv: None, t: 4.0, object: id };
         let is = [i];
         let comps = i.precompute(&reg, &r, &is);
@@ -238,12 +240,12 @@ mod tests {
         let mut w = World::default();
         w.light_source = PointLight::new(Point::new(0.0, 0.25, 0.0), Color::white());
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
-        let reg = w.registry.borrow();
         let i = Intersection { uv: None,
             t: 0.5,
-            object: id(),
+            object: id_from(1),
         };
         let is = [i];
+        let reg = w.registry.borrow();
         let comps = i.precompute(&reg, &r, &is);
         assert_eq!(w.shade(&comps, 1), Color::new(0.90498, 0.90498, 0.90498));
     }
@@ -305,7 +307,6 @@ mod tests {
         }
 
         let reg = registry.borrow();
-        let s = reg.get(id);
         let i = Intersection { uv: None, t: 5.0, object: id };
         let mut is = [i];
         let comps = i.precompute(&reg, &r, &mut is);
@@ -313,120 +314,115 @@ mod tests {
         assert!(comps.point.z > comps.over_point.z);
     }
 
-    use crate::patterns::TestPattern;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    fn update_world(w: &Rc<RefCell<World>>, f: fn(&mut World) -> ()) {
-        f(&mut w.borrow_mut());
-    }
-/* jeez
     #[test]
     fn reflected_color_for_nonreflective_material() {
-        let w = Rc::new(RefCell::new(World::default()));
-        let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
-        let i: Intersection;
-
-        update_world(&w, |world: &mut World| {
-            let mut reg = world.registry.all();
-            let s = reg.last().unwrap();
+        let w = World::default();
+        let id = id_from(2);
+        {
+            let mut reg = w.registry.borrow_mut();
+            let s = reg.get_mut(id);
             s.set_material(Material {
                 ambient: 1.0,
-                ..World::default_sphere2().material
+                ..Material::default()
             });
-        });
+        }
 
-        let world = w.borrow();
-        let reg = world.registry.all();
-        let s = reg.last().unwrap();
-        i = Intersection { uv: None,
+        let reg = w.registry.borrow();
+        let i = Intersection { uv: None,
             t: 1.0,
-            object: s,
+            object: id,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
-        let color = world.reflected_color(&comps, 1);
+        let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.reflected_color(&comps, 1);
         assert_eq!(color, Color::black());
     }
 
     #[test]
     fn reflected_color_for_reflective_material() {
-        let w = Rc::new(RefCell::new(World::default()));
+        let w = World::default();
 
-        update_world(&w, |world: &mut World| {
+        let plane_id = {
+            let mut reg = w.registry.borrow_mut();
             let mut p = Plane::new();
-            p.material.reflective = 0.5;
-            p.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
-            let s = world.registry.all().last_mut().unwrap();
-            s.set_material(Material {
-                ambient: 1.0,
-                ..World::default_sphere2().material
+            p.set_material(Material {
+                reflective: 0.5,
+                ..Material::default()
             });
-            world.registry.register(Box::from(p));
-        });
+            p.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
+            reg.register(Box::from(p))
+        };
 
-        let world = w.borrow();
-        let plane = world.registry.all().last().unwrap();
+        let reg = w.registry.borrow();
         let r = Ray::new(
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
         let i = Intersection { uv: None,
             t: 2_f32.sqrt(),
-            object: &**plane,
+            object: plane_id,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
-        let color = world.reflected_color(&comps, 1);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.reflected_color(&comps, 1);
         assert_eq!(color, Color::new(0.19032, 0.2379, 0.14274));
     }
 
     #[test]
     fn shade_with_a_reflective_material() {
-        ();
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
+        let w = World::default();
+        let id = {
+            let mut reg = w.registry.borrow_mut();
             let mut p = Plane::new();
-            p.material.reflective = 0.5;
+            p.set_material(Material {
+                reflective: 0.5,
+                ..Material::default()
+            });
             p.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
-            world.registry.register(Box::from(p));
-        });
+            reg.register(Box::from(p))
+        };
 
-        let world = w.borrow();
-        let plane = world.registry.all().last().unwrap();
+        let reg = w.registry.borrow();
         let r = Ray::new(
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
         let i = Intersection { uv: None,
             t: 2_f32.sqrt(),
-            object: &**plane,
+            object: id,
         };
         let is = [i];
-        let comps = i.precompute(&r, &is);
-        let color = world.shade(&comps, 1);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.shade(&comps, 1);
         assert_eq!(color, Color::new(0.87677, 0.92436, 0.82918));
     }
 
     #[test]
     fn color_at_with_mutually_recursive_surfaces() {
-        ();
         let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
+        {
+            let mut world = w.borrow_mut();
             world.light_source = PointLight::new(Point::origin(), Color::white());
+        }
+        let world = w.borrow();
+        {
+            let mut reg = world.registry.borrow_mut();
             let mut lower = Plane::new();
-            lower.material.reflective = 1.0;
+            lower.set_material(Material {
+                reflective: 1.0,
+                ..Material::default()
+            });
             lower.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
             let mut upper = Plane::new();
-            upper.material.reflective = 1.0;
+            upper.set_material(Material {
+                reflective: 1.0,
+                ..Material::default()
+            });
             upper.set_transform(Matrix4::translation(0.0, 1.0, 0.0));
-            world.registry.register(Box::from(lower));
-            world.registry.register(Box::from(upper));
-        });
-
-        let world = w.borrow();
+            reg.register(Box::from(lower));
+            reg.register(Box::from(upper));
+        }
         let r = Ray::new(Point::origin(), Vector::new(0.0, 1.0, 0.0));
         let color = world.color_at(&r, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(1.9, 1.9, 1.9));
@@ -435,211 +431,217 @@ mod tests {
     #[test]
     fn refracted_color_with_opaque_surface() {
         let world = World::default();
-        let shape = world.registry.all().first().unwrap();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let is = vec![
             Intersection { uv: None,
                 t: 4.0,
-                object: &**shape,
+                object: id()
             },
             Intersection { uv: None,
                 t: 6.0,
-                object: &**shape,
+                object: id()
             },
         ];
         let i = is[0];
-        let comps = i.precompute(&r, &is);
-        ();
+        let comps = i.precompute(&world.registry.borrow(), &r, &is);
         let color = world.refracted_color(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::black());
     }
 
     #[test]
     fn refracted_color_at_maximum_recursive_depth() {
-        ();
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
-            let first = world.registry.all().first_mut().unwrap();
+        let w = World::default();
+        let id = {
+            let mut reg = w.registry.borrow_mut();
+            let id = id();
+            let first = reg.get_mut(id);
             first.set_material(Material {
                 transparency: 1.0,
                 refractive_index: 1.5,
-                ..World::default_sphere1().material
+                ..Material::default()
             });
-        });
+            id
+        };
 
-        let world = w.borrow();
+        let reg = w.registry.borrow();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
-        let shape = world.registry.all().first().unwrap();
         let is = vec![
             Intersection { uv: None,
                 t: 4.0,
-                object: &**shape,
+                object: id,
             },
             Intersection { uv: None,
                 t: 6.0,
-                object: &**shape,
+                object: id,
             },
         ];
         let i = is[0];
-        let comps = i.precompute(&r, &is);
-        let color = world.refracted_color(&comps, 0);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.refracted_color(&comps, 0);
         assert_eq!(color, Color::black());
     }
 
     #[test]
     fn refracted_color_under_total_internal_reflection() {
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
-            let first = world.registry.all().first_mut().unwrap();
+        let w = World::default();
+        let id = {
+            let mut reg = w.registry.borrow_mut();
+            let id = id();
+            let first = reg.get_mut(id);
             first.set_material(Material {
                 transparency: 1.0,
                 refractive_index: 1.5,
-                ..World::default_sphere1().material
+                ..Material::default()
             });
-        });
+            id
+        };
+        let reg = w.registry.borrow();
 
-        let world = w.borrow();
         let r = Ray::new(
             Point::new(0.0, 0.0, 2_f32.sqrt()),
             Vector::new(0.0, 1.0, 0.0),
         );
-        let shape = world.registry.all().first().unwrap();
         let is = vec![
             Intersection { uv: None,
                 t: -2_f32.sqrt(),
-                object: &**shape,
+                object: id,
             },
             Intersection { uv: None,
                 t: 2_f32.sqrt(),
-                object: &**shape,
+                object: id,
             },
         ];
         let i = is[1];
-        let comps = i.precompute(&r, &is);
-        ();
-        let color = world.refracted_color(&comps, MAX_REFLECTIONS);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.refracted_color(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::black());
     }
 
     #[test]
     fn refracted_color_with_refracted_ray() {
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
-            let first = world.registry.all().first_mut().unwrap();
+        let w = World::default();
+        let id1 = {
+            let mut reg = w.registry.borrow_mut();
+            let first = reg.get_mut(id());
             first.set_material(Material {
                 ambient: 1.0,
                 pattern: Some(Box::from(TestPattern::new())),
-                ..World::default_sphere1().material
+                ..Material::default()
             });
-            let second = world.registry.all().last_mut().unwrap();
+            id()
+        };
+        let id2 = {
+            let mut reg = w.registry.borrow_mut();
+            let second = reg.get_mut(id_from(2));
             second.set_material(Material {
                 transparency: 1.0,
                 refractive_index: 1.5,
-                ..World::default_sphere2().material
+                ..Material::default()
             });
-        });
+            id_from(2)
+        };
+        let reg = w.registry.borrow();
 
-        let world = w.borrow();
         let r = Ray::new(Point::new(0.0, 0.0, 0.1), Vector::new(0.0, 1.0, 0.0));
-        let a = world.registry.all().first().unwrap();
-        let b = world.registry.all().last().unwrap();
         let is = vec![
             Intersection { uv: None,
                 t: -0.9899,
-                object: &**a,
+                object: id1,
             },
             Intersection { uv: None,
                 t: -0.4899,
-                object: &**b,
+                object: id2,
             },
             Intersection { uv: None,
                 t: 0.4899,
-                object: &**b,
+                object: id2,
             },
             Intersection { uv: None,
                 t: 0.9899,
-                object: &**a,
+                object: id1,
             },
         ];
         let i = is[2];
-        let comps = i.precompute(&r, &is);
+        let comps = i.precompute(&reg, &r, &is);
         ();
-        let color = world.refracted_color(&comps, MAX_REFLECTIONS);
+        let color = w.refracted_color(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(0.0, 0.99888, 0.04725));
     }
 
     #[test]
     fn shade_with_transparent_material() {
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
+        let w = World::default();
+        let (fid, _bid) = {
+            let mut reg = w.registry.borrow_mut();
             let mut floor = Plane::new();
             floor.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
-            floor.material.transparency = 0.5;
-            floor.material.refractive_index = 1.5;
+            floor.set_material(Material {
+                transparency: 0.5,
+                refractive_index: 1.5,
+                ..Material::default()
+            });
 
             let mut ball = Sphere::new();
-            ball.material.color = Color::new(1.0, 0.0, 0.0);
-            ball.material.ambient = 0.5;
             ball.set_transform(Matrix4::translation(0.0, -3.5, -0.5));
+            ball.set_material(Material {
+                color: Color::new(1.0, 0.0, 0.0),
+                ambient: 0.5,
+                ..Material::default()
+            });
+            (reg.register(Box::from(floor)), reg.register(Box::from(ball)))
+        };
+        let reg = w.registry.borrow();
 
-            world.registry.register(Box::from(ball));
-            world.registry.register(Box::from(floor));
-        });
-
-        let world = w.borrow();
         let r = Ray::new(
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
-        let floor = world.registry.all().last().unwrap();
         let is = vec![Intersection { uv: None,
             t: 2_f32.sqrt(),
-            object: &**floor,
+            object: fid,
         }];
         let i = is[0];
-        let comps = i.precompute(&r, &is);
-        ();
-        let color = world.shade(&comps, MAX_REFLECTIONS);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.shade(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(0.93642, 0.68642, 0.68642));
     }
 
     #[test]
     fn shade_with_reflective_transparent_material() {
-        let w = Rc::new(RefCell::new(World::default()));
-
-        update_world(&w, |world: &mut World| {
+        let w = World::default();
+        let (fid, _bid) = {
+            let mut reg = w.registry.borrow_mut();
             let mut floor = Plane::new();
             floor.set_transform(Matrix4::translation(0.0, -1.0, 0.0));
-            floor.material.reflective = 0.5;
-            floor.material.transparency = 0.5;
-            floor.material.refractive_index = 1.5;
+            floor.set_material(Material {
+                reflective: 0.5,
+                transparency: 0.5,
+                refractive_index: 1.5,
+                ..Material::default()
+            });
 
             let mut ball = Sphere::new();
-            ball.material.color = Color::new(1.0, 0.0, 0.0);
-            ball.material.ambient = 0.5;
             ball.set_transform(Matrix4::translation(0.0, -3.5, -0.5));
+            ball.set_material(Material {
+                color: Color::new(1.0, 0.0, 0.0),
+                ambient: 0.5,
+                ..Material::default()
+            });
+            (reg.register(Box::from(floor)), reg.register(Box::from(ball)))
+        };
+        let reg = w.registry.borrow();
 
-            world.registry.register(Box::from(ball));
-            world.registry.register(Box::from(floor));
-        });
-
-        let world = w.borrow();
         let r = Ray::new(
             Point::new(0.0, 0.0, -3.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
         );
-        let floor = world.registry.all().last().unwrap();
         let is = vec![Intersection { uv: None,
             t: 2_f32.sqrt(),
-            object: &**floor,
+            object: fid,
         }];
         let i = is[0];
-        let comps = i.precompute(&r, &is);
-        let color = world.shade(&comps, MAX_REFLECTIONS);
+        let comps = i.precompute(&reg, &r, &is);
+        let color = w.shade(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(0.93391, 0.69643, 0.69243));
-    } */
+    }
 }

@@ -1,6 +1,5 @@
 use indextree::NodeId;
 use crate::linear::{Matrix4, Point, Vector, EPSILON};
-use crate::shapes::Shape;
 use crate::registry::Registry;
 
 pub struct Ray {
@@ -201,7 +200,6 @@ mod tests {
         let mut reg = Registry::new();
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let id = reg.register(Box::from(Sphere::new()));
-        let s = reg.get(id);
         let i = Intersection { uv: None, t: 4.0, object: id };
         let is = [i];
         let c = i.precompute(&reg, &r, &is);
@@ -213,7 +211,6 @@ mod tests {
         let r = Ray::new(Point::origin(), Vector::new(0.0, 0.0, 1.0));
         let mut reg = Registry::new();
         let id = reg.register(Box::from(Sphere::new()));
-        let s = reg.get(id);
         let i = Intersection { uv: None, t: 1.0, object: id };
         let mut is = [i];
         let c = i.precompute(&reg, &r, &mut is);
@@ -228,7 +225,6 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let mut reg = Registry::new();
         let id = reg.register(Box::from(Sphere::new()));
-        let s = reg.get(id);
         let i = Intersection { uv: None, t: 4.0, object: id };
         let mut is = [i];
         let c = i.precompute(&reg, &r, &mut is);
@@ -242,7 +238,6 @@ mod tests {
     fn precomputing_reflect_vector() {
         let mut reg = Registry::new();
         let id = reg.register(Box::from(Plane::new()));
-        let s = reg.get(id);
         let r = Ray::new(
             Point::new(0.0, 1.0, -1.0),
             Vector::new(0.0, -2_f32.sqrt() / 2.0, 2_f32.sqrt() / 2.0),
@@ -284,15 +279,15 @@ mod tests {
         let bid = reg.register(Box::from(Sphere::glass()));
         let cid = reg.register(Box::from(Sphere::glass()));
 
-        let mut ma = reg.get_mut(aid);
+        let ma = reg.get_mut(aid);
         ma.set_transform(Matrix4::scaling(2.0, 2.0, 2.0));
         ma.set_material(Material { refractive_index: 1.5, ..Material::default() });
 
-        let mut mb = reg.get_mut(bid);
+        let mb = reg.get_mut(bid);
         mb.set_transform(Matrix4::translation(0.0, 0.0, -0.25));
         mb.set_material(Material { refractive_index: 2.0, ..Material::default() });
 
-        let mut mc = reg.get_mut(cid);
+        let mc = reg.get_mut(cid);
         mc.set_transform(Matrix4::translation(0.0, 0.0, 0.25));
         mc.set_material(Material { refractive_index: 2.5, ..Material::default() });
 
