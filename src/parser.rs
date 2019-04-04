@@ -217,7 +217,10 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
                 let mut csg = Box::from(CSG::new(operation, left, right));
                 csg.set_transform(transform);
                 csg.set_bounds(combined_bounds);
-                reg.register(csg)
+                let id = reg.register(csg);
+                reg.add(id, left);
+                reg.add(id, right);
+                id
             })
         },
         Some("Group") => {
@@ -317,10 +320,10 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
     Ok((w, at, look_at, up, fov.to_radians()))
 }
 
-pub fn read_filename(filename: &str, width: u32, height: u32) -> Result<(World, Camera), Error> {
+pub fn read_filename(filename: &str, width: u32, height: u32, supersampling: usize) -> Result<(World, Camera), Error> {
     let s = fs::read_to_string(filename).or(Err(Error::File(format!("Can't read file {:?}", filename))))?;
     let (world, at, look_at, up, fov) = read_string(&s)?;
-    let mut c = Camera::new(width, height, fov);
+    let mut c = Camera::new(width, height, fov, supersampling);
     c.transform = view_transform(at, look_at, up);
     Ok((world, c))
 }

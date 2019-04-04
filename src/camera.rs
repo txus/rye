@@ -2,18 +2,20 @@ use crate::canvas::{Canvas, DynamicCanvas};
 use crate::linear::{Matrix, Matrix4, Point, Vector};
 use crate::rays::Ray;
 use crate::world::{World, MAX_REFLECTIONS};
+use rand::Rng;
 
 pub struct Camera {
     hsize: u32,
     vsize: u32,
     pub transform: Matrix4,
+    supersampling: usize,
     half_width: f32,
     half_height: f32,
     pixel_size: f32,
 }
 
 impl Camera {
-    pub fn new(hsize: u32, vsize: u32, fov: f32) -> Camera {
+    pub fn new(hsize: u32, vsize: u32, fov: f32, supersampling: usize) -> Camera {
         let half_view = (fov / 2.0).tan();
         let aspect_ratio = hsize as f32 / vsize as f32;
         let landscape = aspect_ratio >= 1.0;
@@ -32,6 +34,7 @@ impl Camera {
         Camera {
             hsize,
             vsize,
+            supersampling,
             pixel_size,
             half_width,
             half_height,
@@ -39,9 +42,9 @@ impl Camera {
         }
     }
 
-    pub fn ray_for_pixel(&self, px: u32, py: u32) -> Ray {
-        let xoffset = (px as f32 + 0.5) * self.pixel_size;
-        let yoffset = (py as f32 + 0.5) * self.pixel_size;
+    pub fn ray_for_pixel(&self, px: f32, py: f32) -> Ray {
+        let xoffset = (px + 0.5) * self.pixel_size;
+        let yoffset = (py + 0.5) * self.pixel_size;
 
         let world_x = self.half_width - xoffset;
         let world_y = self.half_height - yoffset;
@@ -58,13 +61,22 @@ impl Camera {
     pub fn render(&self, world: &World) -> DynamicCanvas {
         let mut canvas = DynamicCanvas::new(self.hsize as usize, self.vsize as usize);
 
+        let samples_per_pixel = self.supersampling * self.supersampling;
+
+        let mut rng = rand::thread_rng();
+
         for y in 0..self.vsize {
             for x in 0..self.hsize {
-                let ray = self.ray_for_pixel(x, y);
-                let color = world.color_at(&ray, MAX_REFLECTIONS);
-                canvas.write(y as usize, x as usize, color);
+                for _ in 0..=samples_per_pixel {
+                    let offset: f32 = rng.gen();
+                    let ray = self.ray_for_pixel((x as f32) + offset, (y as f32) + offset);
+                    let color = world.color_at(&ray, MAX_REFLECTIONS);
+                    canvas.add(y as usize, x as usize, color);
+                }
             }
         }
+
+        canvas.divide(samples_per_pixel as f32);
 
         canvas
     }
@@ -139,34 +151,34 @@ mod tests {
 
     #[test]
     fn camera_pixel_size() {
-        let c = Camera::new(200, 125, PI / 2.0);
+        let c = Camera::new(200, 125, PI / 2.0, 1);
         assert_eq!(c.pixel_size, 0.01);
 
-        let c2 = Camera::new(125, 200, PI / 2.0);
+        let c2 = Camera::new(125, 200, PI / 2.0, 1);
         assert_eq!(c2.pixel_size, 0.01);
     }
 
     #[test]
     fn ray_through_center() {
-        let c = Camera::new(201, 101, PI / 2.0);
-        let r = c.ray_for_pixel(100, 50);
+        let c = Camera::new(201, 101, PI / 2.0, 1);
+        let r = c.ray_for_pixel(100.0, 50.0);
         assert_eq!(r.origin, Point::origin());
         assert_eq!(r.direction, Vector::new(0.0, 0.0, -1.0));
     }
 
     #[test]
     fn ray_through_corner() {
-        let c = Camera::new(201, 101, PI / 2.0);
-        let r = c.ray_for_pixel(0, 0);
+        let c = Camera::new(201, 101, PI / 2.0, 1);
+        let r = c.ray_for_pixel(0.0, 0.0);
         assert_eq!(r.origin, Point::origin());
         assert_eq!(r.direction, Vector::new(0.66519, 0.33259, -0.66851));
     }
 
     #[test]
     fn ray_with_transformed_camera() {
-        let mut c = Camera::new(201, 101, PI / 2.0);
+        let mut c = Camera::new(201, 101, PI / 2.0, 1);
         c.transform = Matrix4::rotation_y(PI / 4.0) * Matrix4::translation(0.0, -2.0, 5.0);
-        let r = c.ray_for_pixel(100, 50);
+        let r = c.ray_for_pixel(100.0, 50.0);
         assert_eq!(r.origin, Point::new(0.0, 2.0, -5.0));
         assert_eq!(
             r.direction,
@@ -180,9 +192,9 @@ mod tests {
         let from = Point::new(0.0, 0.0, -5.0);
         let to = Point::origin();
         let up = Vector::new(0.0, 1.0, 0.0);
-        let mut c = Camera::new(11, 11, PI / 2.0);
+        let mut c = Camera::new(11, 11, PI / 2.0, 1);
         c.transform = view_transform(from, to, up);
         let image = c.render(&w);
-        assert_eq!(image.at(5, 5), Color::new(0.38066, 0.47583, 0.2855));
+        assert!(image.at(5, 5) != Color::black());
     }
 }

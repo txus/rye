@@ -52,6 +52,14 @@ impl Registry {
         shapes
     }
 
+    pub fn children_ids(&self, shape: NodeId) -> Vec<NodeId> {
+        let mut ids = vec![];
+        for id in shape.children(&self.arena) {
+            ids.push(id);
+        }
+        ids
+    }
+
     pub fn all(&self) -> Vec<&Box<Shape>> {
         self.arena.iter().map(|x| &x.data).collect()
     }

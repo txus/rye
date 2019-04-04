@@ -37,12 +37,16 @@ struct Opt {
  
     /// height in pixels
     #[structopt(short = "h", long = "height")]
-    height: u32
+    height: u32,
+
+    /// samples per pixel = supersampling^2
+    #[structopt(short = "s", long = "supersampling")]
+    supersampling: usize
 }
 
 fn main() {
     let opt = Opt::from_args();
-    let (world, camera) = parser::read_filename(&opt.scene.to_str().unwrap(), opt.width, opt.height).unwrap();
+    let (world, camera) = parser::read_filename(&opt.scene.to_str().unwrap(), opt.width, opt.height, opt.supersampling).unwrap();
     let instant = Instant::now();
     let canvas = camera.render(&world);
     output::render(&canvas, output::ppm::PPM {}, opt.output.to_str().unwrap());

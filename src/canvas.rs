@@ -5,6 +5,18 @@ pub trait Canvas {
     fn height(&self) -> usize;
     fn write(&mut self, y: usize, x: usize, color: Color);
     fn at(&self, y: usize, x: usize) -> Color;
+    fn add(&mut self, y: usize, x: usize, color: Color) {
+        let c = self.at(y, x);
+        self.write(y, x, c + color);
+    }
+    fn divide(&mut self, factor: f32) {
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                let c = self.at(y, x);
+                self.write(y, x, c / factor);
+            }
+        }
+    }
 }
 
 pub struct DynamicCanvas {

@@ -1184,14 +1184,27 @@ impl CSG {
         }
     }
 
-    fn filter_intersections(&self, is: &[Intersection]) -> Vec<Intersection> {
+    fn filter_intersections(&self, reg: &Registry, is: &[Intersection]) -> Vec<Intersection> {
         let mut inl = false;
         let mut inr = false;
+        let children = reg.children_ids(self.left);
 
         let mut result: Vec<Intersection> = vec![];
 
         for i in is {
-            let lhit = self.left == i.object;
+            let lhit = {
+                if children.is_empty() {
+                    self.left == i.object
+                } else {
+                    let mut hit = false;
+                    for id in &children {
+                        if self.left == *id {
+                            hit = true;
+                        }
+                    }
+                    hit
+                }
+            };
 
             if self.intersection_allowed(lhit, inl, inr) {
                 result.push(*i);
@@ -1259,7 +1272,7 @@ impl Shape for CSG {
         leftxs.append(&mut rightxs);
         leftxs.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
 
-        self.filter_intersections(&leftxs)
+        self.filter_intersections(&reg, &leftxs)
     }
 }
 
@@ -2434,17 +2447,17 @@ mod tests {
             ];
 
             assert_eq!(
-                u.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                u.filter_intersections(&reg, &is).iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec![1.0, 4.0]
                 );
 
             assert_eq!(
-                i.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                i.filter_intersections(&reg, &is).iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec![2.0, 3.0]
                 );
 
             assert_eq!(
-                d.filter_intersections(&is).iter().map(|x| x.t).collect::<Vec<f32>>(),
+                d.filter_intersections(&reg, &is).iter().map(|x| x.t).collect::<Vec<f32>>(),
                 vec![1.0, 2.0]
                 );
         }
