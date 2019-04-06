@@ -20,6 +20,6 @@ To render a scene from the example [scenes](scenes) folder:
 
 ```
 cargo build --release
-./target/release/rye  --height 150 --width 200 --scene scenes/basic.yml --output render.ppm
+./target/release/rye  --height 150 --width 200 --scene scenes/basic.yml --output render.ppm --supersampling 4
 
 ```

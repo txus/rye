@@ -54,7 +54,7 @@ impl Material {
         position: &Point,
         eye: &Vector,
         normal: &Vector,
-        in_shadow: bool,
+        intensity: f32,
     ) -> Color {
         let color = if let Some(pattern) = &self.pattern {
             pattern.color_at_object(&object, &position)
@@ -63,10 +63,6 @@ impl Material {
         };
         let effective_color = color * light.intensity;
         let ambient = effective_color * self.ambient;
-
-        if in_shadow {
-            return ambient;
-        }
 
         let lightv = (light.position - *position).normalize();
         let light_dot_normal = lightv.dot(normal);
@@ -87,7 +83,7 @@ impl Material {
                 specular = light.intensity * self.specular * factor;
             }
         }
-        ambient + diffuse + specular
+        ambient + ((diffuse + specular) * intensity)
     }
 }
 
@@ -105,7 +101,7 @@ mod tests {
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 1.0);
         assert_eq!(result, Color::new(1.9, 1.9, 1.9));
     }
 
@@ -117,7 +113,7 @@ mod tests {
         let eye = Vector::new(0.0, 2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 1.0);
         assert_eq!(result, Color::white());
     }
 
@@ -129,7 +125,7 @@ mod tests {
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::white());
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 1.0);
         assert_eq!(result, Color::new(0.7364, 0.7364, 0.7364));
     }
 
@@ -141,7 +137,7 @@ mod tests {
         let eye = Vector::new(0.0, -2_f32.sqrt() / 2.0, -2_f32.sqrt() / 2.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Color::white());
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 1.0);
         assert_eq!(result, Color::new(1.6364, 1.6364, 1.6364));
     }
 
@@ -153,7 +149,7 @@ mod tests {
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::white());
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, false);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 1.0);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
 
@@ -165,8 +161,7 @@ mod tests {
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Color::white());
-        let in_shadow = true;
-        let result = mat.lighting(&s, &light, &position, &eye, &normal, in_shadow);
+        let result = mat.lighting(&s, &light, &position, &eye, &normal, 0.0);
         assert_eq!(result, Color::new(0.1, 0.1, 0.1));
     }
 
@@ -184,8 +179,8 @@ mod tests {
         let eye = Vector::new(0.0, 0.0, -1.0);
         let normal = Vector::new(0.0, 0.0, -1.0);
         let light = PointLight::new(Point::new(0.0, 0.0, 10.0), Color::white());
-        let c1 = mat.lighting(&s, &light, &Point::new(0.9, 0.0, 0.0), &eye, &normal, false);
-        let c2 = mat.lighting(&s, &light, &Point::new(1.1, 0.0, 0.0), &eye, &normal, false);
+        let c1 = mat.lighting(&s, &light, &Point::new(0.9, 0.0, 0.0), &eye, &normal, 1.0);
+        let c2 = mat.lighting(&s, &light, &Point::new(1.1, 0.0, 0.0), &eye, &normal, 1.0);
         assert_eq!(c1, Color::white());
         assert_eq!(c2, Color::black());
     }

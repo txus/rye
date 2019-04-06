@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::light::PointLight;
+use crate::light::{Light, PointLight};
 use crate::linear::{Matrix4, Point};
 use crate::materials::Material;
 use crate::rays::{Intersection, Precomputation, Ray};
@@ -88,7 +88,7 @@ impl World {
             &c.over_point,
             &c.eye,
             &c.normal,
-            self.is_shadowed(&c.over_point),
+            self.light_source.intensity_at(&c.over_point, &self),
         );
         let reflected = self.reflected_color(&c, remaining);
         let refracted = self.refracted_color(&c, remaining);
@@ -147,8 +147,8 @@ impl World {
         }
     }
 
-    pub fn is_shadowed(&self, p: &Point) -> bool {
-        let v = self.light_source.position - *p;
+    pub fn is_shadowed(&self, light_position: &Point, p: &Point) -> bool {
+        let v = *light_position - *p;
         let distance = v.magnitude();
         let direction = v.normalize();
 
@@ -179,23 +179,6 @@ mod tests {
     use crate::patterns::TestPattern;
     use std::cell::RefCell;
     use std::rc::Rc;
-
-    #[test]
-    fn default_world() {
-        let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
-        let mut s1 = Sphere::new();
-        s1.set_material(Material {
-            color: Color::new(0.8, 1.0, 0.6),
-            diffuse: 0.7,
-            specular: 0.2,
-            ..Material::default()
-        });
-        let mut s2 = Sphere::new();
-        s2.set_transform(Matrix4::scaling(0.5, 0.5, 0.5));
-
-        let w = World::default();
-        assert_eq!(w.light_source, light);
-    }
 
     #[test]
     fn intersect_world() {
@@ -266,34 +249,6 @@ mod tests {
         let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
         let c = w.color_at(&r, 1);
         assert_eq!(c, Color::new(0.38066, 0.47582, 0.2855));
-    }
-
-    #[test]
-    fn no_shadow_when_nothing_is_collinear_with_point_and_light() {
-        let w = World::default();
-        let p = Point::new(0.0, 10.0, 0.0);
-        assert_eq!(w.is_shadowed(&p), false);
-    }
-
-    #[test]
-    fn shadow_when_object_is_between_light_and_point() {
-        let w = World::default();
-        let p = Point::new(10.0, -10.0, 10.0);
-        assert_eq!(w.is_shadowed(&p), true);
-    }
-
-    #[test]
-    fn no_shadow_when_object_is_behind_the_light() {
-        let w = World::default();
-        let p = Point::new(-20.0, 20.0, -20.0);
-        assert_eq!(w.is_shadowed(&p), false);
-    }
-
-    #[test]
-    fn no_shadow_when_object_is_behind_the_point() {
-        let w = World::default();
-        let p = Point::new(-2.0, 2.0, -2.0);
-        assert_eq!(w.is_shadowed(&p), false);
     }
 
     #[test]
@@ -645,5 +600,22 @@ mod tests {
         let comps = i.precompute(&reg, &r, &is);
         let color = w.shade(&comps, MAX_REFLECTIONS);
         assert_eq!(color, Color::new(0.93391, 0.69643, 0.69243));
+    }
+
+    #[test]
+    fn is_shadowed_test_for_occlusion_between_two_points() {
+        let w = World::default();
+        let light_pos = Point::new(-10.0, -10.0, -10.0);
+
+        let examples: Vec<(Point, bool)> = vec![
+            (Point::new(-10.0, -10.0, 10.0), false),
+            (Point::new(10.0, 10.0, 10.0), true),
+            (Point::new(-20.0, -20.0, -20.0), false),
+            (Point::new(-5.0, -5.0, -5.0), false),
+        ];
+
+        for (p, result) in &examples {
+            assert_eq!(w.is_shadowed(&light_pos, &p), *result);
+        }
     }
 }
