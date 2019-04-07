@@ -3,57 +3,61 @@ camera:
     look_at: [2, 0, 3]
     up: [0, 1, 0]
     fov: 30
-light:
-    type: PointLight
-    at: [-5, 10, -5]
-    intensity: [1, 1, 1]
+lights:
+    - type: PointLight
+      at: [-5, 10, -5]
+      color: [1, 1, 1]
 
 objects:
-    - shape: Plane
-      at: [0, 0, 5]
-      rotate: [-90, 0, 0]
-      material:
-        color: [0, 0, 0]
-        pattern:
-          type: Checker
-          a: [1, 1, 1]
-          b: [0.1, 0.1, 0.1]
-    - shape: Plane
-      at: [0, 0, -6]
-      rotate: [-90, 0, 0]
-      material:
-        color: [0, 0, 0]
-        pattern:
-          type: Checker
-          a: [1, 1, 1]
-          b: [0.1, 0.1, 0.1]
-    - shape: Plane
-      at: [-6, 0, 0]
-      rotate: [0, 0, 90]
-      material:
-        color: [0, 0, 0]
-        pattern:
-          type: Checker
-          a: [1, 1, 1]
-          b: [0.1, 0.1, 0.1]
-    - shape: Plane
-      at: [6, 0, 0]
-      rotate: [0, 0, 90]
-      material:
-        color: [0, 0, 0]
-        pattern:
-          type: Checker
-          a: [1, 1, 1]
-          b: [0.1, 0.1, 0.1]
-    - shape: Plane
-      at: [0, 0, 0]
-      material:
-        color: [0, 0, 0]
-        pattern:
-          type: Checker
-          a: [1, 1, 1]
-          b: [0.1, 0.1, 0.1]
+    - shape: Group
+      name: Environment
+      children:
+      - shape: Plane
+        at: [0, 0, 5]
+        rotate: [-90, 0, 0]
+        material:
+          color: [0, 0, 0]
+          pattern:
+            type: Checker
+            a: [1, 1, 1]
+            b: [0.1, 0.1, 0.1]
+      - shape: Plane
+        at: [0, 0, -6]
+        rotate: [-90, 0, 0]
+        material:
+          color: [0, 0, 0]
+          pattern:
+            type: Checker
+            a: [1, 1, 1]
+            b: [0.1, 0.1, 0.1]
+      - shape: Plane
+        at: [-6, 0, 0]
+        rotate: [0, 0, 90]
+        material:
+          color: [0, 0, 0]
+          pattern:
+            type: Checker
+            a: [1, 1, 1]
+            b: [0.1, 0.1, 0.1]
+      - shape: Plane
+        at: [6, 0, 0]
+        rotate: [0, 0, 90]
+        material:
+          color: [0, 0, 0]
+          pattern:
+            type: Checker
+            a: [1, 1, 1]
+            b: [0.1, 0.1, 0.1]
+      - shape: Plane
+        at: [0, 0, 0]
+        material:
+          color: [0, 0, 0]
+          pattern:
+            type: Checker
+            a: [1, 1, 1]
+            b: [0.1, 0.1, 0.1]
     - shape: Sphere
+      name: BigSphere
       at: [-0.5, 1, 2]
       scale: [2, 2, 2]
       material:
@@ -62,6 +66,7 @@ objects:
         specular: 1
         reflective: 0.8
     - shape: Sphere
+      name: SmallSphere
       at: [2.2, 1, -1]
       material:
         color: [0.4, 0, 0.4]
@@ -69,6 +74,7 @@ objects:
         specular: 1
         reflective: 0.2
     - shape: Cylinder
+      name: LeftCyl
       at: [-3.5, 0, 1]
       closed: true
       minimum: -1
@@ -85,6 +91,7 @@ objects:
             scale: [1.1, 1.1, 1.1]
             rotate: [0, 90, 0]
     - shape: Cube
+      name: SmallCube
       at: [0.6, 0.4, -1]
       rotate: [0, 60, 0]
       scale: [0.4, 0.4, 0.4]

@@ -18,6 +18,7 @@ mod world;
 mod parser;
 mod obj_parser;
 mod registry;
+mod jitter;
 
 /// A rye (tracer)
 #[derive(StructOpt, Debug)]

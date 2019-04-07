@@ -53,6 +53,17 @@ impl std::ops::Add<Color> for Color {
     }
 }
 
+impl std::ops::Add<f32> for Color {
+    type Output = Self;
+    fn add(self, other: f32) -> Self {
+        Self::new(
+            self.red + other,
+            self.green + other,
+            self.blue + other,
+        )
+    }
+}
+
 impl std::ops::Sub<Color> for Color {
     type Output = Self;
     fn sub(self, other: Color) -> Self {

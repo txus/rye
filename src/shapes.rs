@@ -122,6 +122,8 @@ impl Bounds {
 
 pub trait Shape: Send + Sync {
     fn id(&self) -> i32;
+    fn name(&self) -> &Option<String>;
+    fn set_name(&mut self, _name: String) {}
     fn bounds(&self) -> &Bounds;
     fn set_bounds(&mut self, bounds: Bounds);
     fn set_tag(&mut self, id: NodeId);
@@ -172,6 +174,7 @@ impl std::cmp::PartialEq for Shape {
 
 pub struct Sphere {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub bounds: Bounds,
@@ -186,6 +189,7 @@ impl Sphere {
             id: gen_id(),
             tag: None,
             material: None,
+            name: Some("Sphere".to_owned()),
             transform: Matrix4::id(),
             casts_shadows: true,
             bounds: Bounds(Point::new(-1.0, -1.0, -1.0), Point::new(1.0, 1.0, 1.0)),
@@ -196,6 +200,7 @@ impl Sphere {
     pub fn glass() -> Self {
         Sphere {
             id: gen_id(),
+            name: Some("Glass Sphere".to_owned()),
             tag: None,
             material: Some(Material {
                 transparency: 1.0,
@@ -213,6 +218,9 @@ impl Sphere {
 impl Shape for Sphere {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -285,6 +293,7 @@ impl Shape for Sphere {
 
 pub struct Plane {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Option<Material>,
@@ -297,6 +306,7 @@ impl Plane {
     pub fn new() -> Plane {
         Plane {
             id: gen_id(),
+            name: Some("Plane".to_owned()),
             tag: None,
             transform: Matrix4::id(),
             material: None,
@@ -310,6 +320,9 @@ impl Plane {
 impl Shape for Plane {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -361,6 +374,7 @@ impl Shape for Plane {
 
 pub struct Cube {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Option<Material>,
@@ -373,6 +387,7 @@ impl Cube {
     pub fn new() -> Cube {
         Cube {
             id: gen_id(),
+            name: Some("Cube".to_owned()),
             tag: None,
             transform: Matrix4::id(),
             material: None,
@@ -406,6 +421,9 @@ fn check_axis(origin: f32, direction: f32) -> (f32, f32) {
 impl Shape for Cube {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -481,6 +499,7 @@ impl Shape for Cube {
 
 pub struct Cylinder {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Option<Material>,
@@ -496,6 +515,7 @@ impl Cylinder {
     pub fn new() -> Cylinder {
         Cylinder {
             id: gen_id(),
+            name: Some("Cylinder".to_owned()),
             tag: None,
             transform: Matrix4::id(),
             material: None,
@@ -555,6 +575,9 @@ impl Cylinder {
 impl Shape for Cylinder {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -645,6 +668,7 @@ impl Shape for Cylinder {
 
 pub struct Cone {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Option<Material>,
@@ -665,6 +689,7 @@ impl Cone {
     pub fn new() -> Cone {
         Cone {
             id: gen_id(),
+            name: Some("Cone".to_owned()),
             tag: None,
             transform: Matrix4::id(),
             material: None,
@@ -701,6 +726,9 @@ impl Cone {
 impl Shape for Cone {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -819,6 +847,7 @@ impl Shape for Cone {
 
 pub struct Group {
     pub id: i32,
+    pub name: Option<String>,
     pub tag: Option<NodeId>,
     pub transform: Matrix4,
     pub material: Option<Material>,
@@ -832,6 +861,7 @@ impl Group {
         let transform = Matrix4::id();
         Group {
             id: gen_id(),
+            name: Some("Group".to_owned()),
             tag: None,
             transform: transform,
             inverse_transform: transform.inverse(),
@@ -854,6 +884,12 @@ pub fn precompute_bounds(children: Vec<&Box<Shape>>) -> Bounds {
 impl Shape for Group {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
+    }
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -907,6 +943,7 @@ impl Shape for Group {
 }
 
 pub struct Triangle {
+    pub name: Option<String>,
     a: Point,
     b: Point,
     c: Point,
@@ -942,6 +979,7 @@ impl Triangle {
         );
 
         Triangle {
+            name: None,
             a, b, c, e1, e2, normal,
             id: 0, //gen_id(),
             casts_shadows: true,
@@ -957,6 +995,9 @@ impl Triangle {
 impl Shape for Triangle {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -1023,6 +1064,7 @@ impl Shape for Triangle {
 }
 
 pub struct SmoothTriangle {
+    pub name: Option<String>,
     a: Point,
     b: Point,
     c: Point,
@@ -1061,6 +1103,7 @@ impl SmoothTriangle {
         );
 
         SmoothTriangle {
+            name: None,
             a, b, c, n1, n2, n3, e1, e2,
             id: 0, //gen_id(),
             casts_shadows: true,
@@ -1076,6 +1119,9 @@ impl SmoothTriangle {
 impl Shape for SmoothTriangle {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -1150,6 +1196,7 @@ pub enum CSGOperation {
 }
 
 pub struct CSG {
+    pub name: Option<String>,
     pub operation: CSGOperation,
     pub left: NodeId,
     pub right: NodeId,
@@ -1165,6 +1212,7 @@ pub struct CSG {
 impl CSG {
     pub fn new(operation: CSGOperation, left: NodeId, right: NodeId) -> CSG {
         CSG {
+            name: Some("CSG".to_owned()),
             operation, left, right,
             tag: None,
             id: gen_id(),
@@ -1224,6 +1272,9 @@ impl CSG {
 impl Shape for CSG {
     fn id(&self) -> i32 {
         self.id
+    }
+    fn name(&self) -> &Option<String> {
+        &self.name
     }
     fn bounds(&self) -> &Bounds {
         &self.bounds
@@ -1291,12 +1342,14 @@ mod tests {
         material: Option<Material>,
         bounds: Bounds,
         expected_ray: Ray,
+        name: Option<String>,
     }
 
     impl TestShape {
         pub fn new(expected_ray: Ray) -> TestShape {
             TestShape {
                 tag: None,
+                name: None,
                 transform: Matrix4::id(),
                 material: None,
                 inverse_transform: Matrix4::id().inverse(),
@@ -1309,6 +1362,9 @@ mod tests {
     impl Shape for TestShape {
         fn id(&self) -> i32 {
             0
+        }
+        fn name(&self) -> &Option<String> {
+            &self.name
         }
         fn bounds(&self) -> &Bounds {
             &self.bounds

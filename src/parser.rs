@@ -1,7 +1,7 @@
 use yaml_rust::{YamlLoader, Yaml};
 use std::fs;
 use indextree::NodeId;
-use crate::light::PointLight;
+use crate::light::{PointLight, AreaLight, Light};
 use crate::world::World;
 use crate::shapes::{Shape, Cube, Sphere, Cylinder, Cone, Plane, Group, precompute_bounds, CSG, CSGOperation};
 use crate::linear::{Point, Vector, Matrix4, Matrix};
@@ -23,6 +23,13 @@ pub enum Error {
     Parse(String),
     File(String),
     EmptyDocument,
+}
+
+fn parse_usize(doc: &Yaml, context: &Yaml) -> Result<usize, Error> {
+    match doc.as_i64().map(|x| x as usize) {
+        Some(f) => Ok(f),
+        _ => Err(Error::Parse(format!("Error parsing number: {:?} -- context: {:?}", doc, context)))
+    }
 }
 
 fn parse_f32(doc: &Yaml, context: &Yaml) -> Result<f32, Error> {
@@ -51,15 +58,23 @@ fn parse_color(doc: &Yaml) -> Result<Color, Error> {
     parse_tuple(doc).map(|(a, b, c)| Color::new(a, b, c))
 }
 
-fn parse_light(doc: &Yaml) -> Result<PointLight, Error> {
+fn parse_light(doc: &Yaml) -> Result<Box<Light>, Error> {
     let position = parse_point(&doc["at"])?;
-    let color = parse_color(&doc["intensity"])?;
+    let color = parse_color(&doc["color"])?;
     match doc["type"].as_str() {
-        Some("PointLight") => Ok(PointLight {
-            position: position,
-            intensity: color,
-        }),
-        _ => Err(unknown("Light", doc, "type", "PointLight"))
+        Some("PointLight") => Ok(Box::from(PointLight::new(
+            position,
+            color
+        ))),
+        Some("AreaLight") => Ok(Box::from(AreaLight::new(
+            position,
+            parse_vector(&doc["uvec"])?,
+            parse_usize(&doc["usteps"], &doc)?,
+            parse_vector(&doc["vvec"])?,
+            parse_usize(&doc["vsteps"], &doc)?,
+            color,
+        ))),
+        _ => Err(unknown("Light", doc, "type", "PointLight, AreaLight"))
     }
 }
 
@@ -118,9 +133,11 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
     let transform = translation * scale * rotation;
     let material = parse_material(&doc["material"]);
     let casts_shadows = doc["casts_shadows"].as_bool().unwrap_or(true);
+    let name = doc["name"].as_str();
     match doc["shape"].as_str() {
         Some("Cube") => {
             let mut c = Cube::new();
+            if let Some(n) = name { c.name = Some(n.to_string()) };
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             c.casts_shadows = casts_shadows;
@@ -131,6 +148,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
         },
         Some("Sphere") => {
             let mut s = Sphere::new();
+            if let Some(n) = name { s.name = Some(n.to_string()) };
             s.set_transform(transform);
             if let Ok(m) = material { s.set_material(m) }
             s.casts_shadows = casts_shadows;
@@ -141,6 +159,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
         },
         Some("Plane") => {
             let mut p = Plane::new();
+            if let Some(n) = name { p.name = Some(n.to_string()) };
             p.set_transform(transform);
             if let Ok(m) = material { p.set_material(m) }
             p.casts_shadows = casts_shadows;
@@ -151,6 +170,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
         },
         Some("Cylinder") => {
             let mut c = Cylinder::new();
+            if let Some(n) = name { c.name = Some(n.to_string()) };
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             if let Ok(min) = parse_f32(&doc["minimum"], doc) {
@@ -175,6 +195,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
         },
         Some("Cone") => {
             let mut c = Cone::new();
+            if let Some(n) = name { c.name = Some(n.to_string()) };
             c.set_transform(transform);
             if let Ok(m) = material { c.set_material(m) }
             if let Ok(min) = parse_f32(&doc["minimum"], doc) {
@@ -215,6 +236,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
             Ok({
                 let mut reg = registry.borrow_mut();
                 let mut csg = Box::from(CSG::new(operation, left, right));
+                if let Some(n) = name { csg.name = Some(n.to_string()) };
                 csg.set_transform(transform);
                 csg.set_bounds(combined_bounds);
                 let id = reg.register(csg);
@@ -228,6 +250,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
                 let gid = {
                     let mut reg = registry.borrow_mut();
                     let mut g = Box::from(Group::new());
+                    if let Some(n) = name { g.name = Some(n.to_string()) };
                     g.set_transform(transform);
                     if let Ok(m) = material { g.set_material(m) }
                     reg.register(g)
@@ -263,6 +286,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
                 let results = obj_parser::read_filename(&mut reg, &filename).expect("can't parse OBJ file");
                 let root_group_id = results.root;
                 let g = reg.get_mut(root_group_id);
+                if let Some(n) = name { g.set_name(n.to_string()) };
                 g.set_transform(transform);
                 if let Ok(m) = material { g.set_material(m) }
                 results
@@ -298,8 +322,17 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
 pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error> {
     let docs = YamlLoader::load_from_str(s).or(Err(Error::EmptyDocument))?;
     let doc = &docs[0];
-    let light = parse_light(&doc["light"])?;
     let mut w = World::empty();
+
+    let light_array = match &doc["lights"] {
+        Yaml::Array(a) => Ok(a),
+        _ => Err(Error::Parse("'lights' is not an array".to_owned()))
+    }?;
+
+    let mut lights: Vec<Box<Light>> = vec![];
+    for l in light_array.iter() {
+        lights.push(parse_light(&l).unwrap());
+    }
 
     let obj_array = match &doc["objects"] {
         Yaml::Array(a) => Ok(a),
@@ -310,7 +343,11 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
         parse_object(w.registry.clone(), &o).unwrap();
     }
 
-    w.light_source = light;
+    let r = w.registry.clone();
+    let x = r.borrow();
+    x.print();
+
+    w.lights = lights;
 
     let at = parse_point(&doc["camera"]["at"])?;
     let look_at = parse_point(&doc["camera"]["look_at"])?;
@@ -341,10 +378,10 @@ camera:
     look_at: [0, 0, 3]
     up: [0, 1, 0]
     fov: 50
-light:
-    type: PointLight
-    at: [1, 6, 5]
-    intensity: [1, 1, 1]
+lights:
+    - type: PointLight
+      at: [1, 6, 5]
+      color: [1, 1, 1]
 
 objects:
     - shape: Cube
@@ -374,8 +411,6 @@ objects:
       scale: [1, 2, 6]
 ";
         let (world, _camera_at, _camera_look_at, _camera_up, _camera_fov) = read_string(&s).unwrap();
-        assert_eq!(world.light_source.position, Point::new(1.0, 6.0, 5.0));
-        assert_eq!(world.light_source.intensity, Color::white());
         assert_eq!(world.registry.borrow().all().len(), 5);
     }
 }

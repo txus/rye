@@ -64,6 +64,17 @@ impl Registry {
         self.arena.iter().map(|x| &x.data).collect()
     }
 
+    pub fn print(&self) {
+        for id in &self.all_ids() {
+            let o = &self.arena.get(id.clone()).unwrap().data;
+            let n = match o.name() {
+                Some(ref n) => n.clone(),
+                _ => "(unnamed)".to_string()
+            };
+            println!("{}: {}\n", id, n);
+        }
+    }
+
     pub fn all_ids(&self) -> Vec<NodeId> {
         let count = self.arena.count();
         let mut out: Vec<NodeId> = vec![];

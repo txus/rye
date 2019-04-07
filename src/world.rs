@@ -13,7 +13,7 @@ pub const MAX_REFLECTIONS: usize = 4;
 
 pub struct World {
     pub registry: Rc<RefCell<Registry>>,
-    pub light_source: PointLight,
+    pub lights: Vec<Box<Light>>,
 }
 
 impl World {
@@ -49,7 +49,7 @@ impl World {
 
         World {
             registry: registry,
-            light_source: light,
+            lights: vec![Box::from(light)],
         }
     }
 
@@ -57,7 +57,7 @@ impl World {
         let light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Color::white());
         World {
             registry: Rc::new(RefCell::new(Registry::new())),
-            light_source: light,
+            lights: vec![Box::from(light)],
         }
     }
 
@@ -82,13 +82,12 @@ impl World {
         let reg = self.registry.borrow();
         let object = reg.get(c.object);
         let material = object.material(&reg);
+
         let surface = material.lighting(
             &object,
-            &self.light_source,
-            &c.over_point,
-            &c.eye,
-            &c.normal,
-            self.light_source.intensity_at(&c.over_point, &self),
+            &self.lights,
+            &c,
+            &self,
         );
         let reflected = self.reflected_color(&c, remaining);
         let refracted = self.refracted_color(&c, remaining);
