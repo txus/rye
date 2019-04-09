@@ -68,7 +68,11 @@ impl Camera {
         for y in 0..self.vsize {
             for x in 0..self.hsize {
                 for _ in 0..=samples_per_pixel {
-                    let offset: f32 = rng.gen();
+                    let offset: f32 = if samples_per_pixel == 1 {
+                        0.5
+                        } else {
+                        rng.gen()
+                        };
                     let ray = self.ray_for_pixel((x as f32) + offset, (y as f32) + offset);
                     let color = world.color_at(&ray, MAX_REFLECTIONS);
                     canvas.add(y as usize, x as usize, color);

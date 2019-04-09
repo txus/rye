@@ -4,9 +4,13 @@ camera:
     up: [0, 1, 0]
     fov: 30
 lights:
-    - type: PointLight
-      at: [-5, 10, -5]
-      color: [1, 1, 1]
+    - type: AreaLight
+      at: [-5, 5, -5]
+      color: [1, 0.7, 0.7]
+      uvec: [0, 0, 0]
+      usteps: 4
+      vvec: [0, 0, 0]
+      vsteps: 4
 
 objects:
     - shape: Group

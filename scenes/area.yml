@@ -1,0 +1,53 @@
+camera:
+  fov: 30
+  at: [-3, 1, 2.5]
+  look_at: [0, 0.5, 0]
+  up: [0, 1, 0]
+
+lights:
+  - type: AreaLight
+    at: [-1, 2, 4]
+    uvec: [2, 0, 0]
+    vvec: [0, 2, 0]
+    usteps: 10
+    vsteps: 10
+    color: [1.5, 1.5, 1.5]
+
+objects:
+  - shape: Cube
+    name: LightPanel
+    at: [0, 3, 4]
+    scale: [1, 1, 0.01]
+    casts_shadows: false
+    material:
+      color: [1.5, 1.5, 1.5]
+      ambient: 1
+      diffuse: 0
+      specular: 0
+  - shape: Plane
+    name: Floor
+    material:
+      color: [1, 1, 1]
+      ambient: 0.025
+      diffuse: 0.67
+      specular: 0
+  - shape: Sphere
+    name: BiggerSphere
+    at: [0.5, 0.5, 0]
+    scale: [0.5, 0.5, 0.5]
+    material:
+      color: [1, 0, 0]
+      ambient: 0.1
+      specular: 0
+      diffuse: 0.6
+      reflective: 0.3
+  - shape: Sphere
+    name: SmallerSphere
+    at: [-0.25, 0.33, 0]
+    scale: [0.33, 0.33, 0.33]
+    material:
+      color: [0.5, 0.5, 1]
+      ambient: 0.1
+      specular: 0
+      diffuse: 0.6
+      reflective: 0.3

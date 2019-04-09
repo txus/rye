@@ -28,14 +28,14 @@ pub enum Error {
 fn parse_usize(doc: &Yaml, context: &Yaml) -> Result<usize, Error> {
     match doc.as_i64().map(|x| x as usize) {
         Some(f) => Ok(f),
-        _ => Err(Error::Parse(format!("Error parsing number: {:?} -- context: {:?}", doc, context)))
+        _ => Err(Error::Parse(format!("Error parsing usize: {:?} -- context: {:?}", doc, context)))
     }
 }
 
 fn parse_f32(doc: &Yaml, context: &Yaml) -> Result<f32, Error> {
     match doc.as_f64().map(|x| x as f32).or(doc.as_i64().map(|x| x as f32)) {
         Some(f) => Ok(f),
-        _ => Err(Error::Parse(format!("Error parsing number: {:?} -- context: {:?}", doc, context)))
+        _ => Err(Error::Parse(format!("Error parsing float: {:?} -- context: {:?}", doc, context)))
     }
 }
 
@@ -219,8 +219,8 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
             })
         },
         Some("CSG") => {
-            let left = parse_object(registry.clone(), &doc["left"]).unwrap();
-            let right = parse_object(registry.clone(), &doc["right"]).unwrap();
+            let left = parse_object(registry.clone(), &doc["left"]).expect("can't parse CSG left branch");
+            let right = parse_object(registry.clone(), &doc["right"]).expect("can't parse CSG right branch");
             let combined_bounds = {
                 let reg = registry.borrow();
                 let l = reg.get(left);
@@ -262,7 +262,7 @@ fn parse_object(registry: Rc<RefCell<Registry>>, doc: &Yaml) -> Result<NodeId, E
                 }?;
 
                 for o in obj_array.iter() {
-                    let id = parse_object(registry.clone(), &o).unwrap();
+                    let id = parse_object(registry.clone(), &o).expect("couldn't parse object");
                     let mut reg = registry.borrow_mut();
                     reg.add(gid, id);
                 }
@@ -331,7 +331,7 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
 
     let mut lights: Vec<Box<Light>> = vec![];
     for l in light_array.iter() {
-        lights.push(parse_light(&l).unwrap());
+        lights.push(parse_light(&l).expect("couldn't parse light"));
     }
 
     let obj_array = match &doc["objects"] {
@@ -340,7 +340,7 @@ pub fn read_string(s: &str) -> Result<(World, Point, Point, Vector, f32), Error>
     }?;
 
     for o in obj_array.iter() {
-        parse_object(w.registry.clone(), &o).unwrap();
+        parse_object(w.registry.clone(), &o).expect("can't parse object");
     }
 
     let r = w.registry.clone();

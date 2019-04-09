@@ -41,7 +41,7 @@ struct Opt {
     height: u32,
 
     /// samples per pixel = supersampling^2
-    #[structopt(short = "s", long = "supersampling")]
+    #[structopt(short = "s", long = "supersampling", default_value = "1")]
     supersampling: usize
 }
 

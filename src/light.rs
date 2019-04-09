@@ -66,7 +66,7 @@ impl Light for AreaLight {
                 let mut the = the_jitter.deref_mut();
                 let light_position = self.point_on_light(&mut the, u, v);
                 if !w.is_shadowed(&light_position, &comps.over_point) {
-                    let lightv = (light_position - comps.point).normalize();
+                    let lightv = (light_position - comps.over_point).normalize();
                     result = result + mat.lighten_hit(&color, &lightv, &self.intensity, &comps);
                 }
             }
